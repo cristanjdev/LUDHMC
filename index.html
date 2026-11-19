@@ -1,0 +1,1656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LUDHMC Care Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Public+Sans:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: prototype control bar on top; below it either the hospital website (with the chat widget docked
+   bottom-right) or the staff panel (sidebar + working panes). 60/30/10: neutrals / green+navy / red+gold. */
+:root{
+  color-scheme: light;
+  /* 60 — neutrals */
+  --white:#FFFFFF; --mist:#F4F9F6; --line:#D9E6DF; --line-2:#E9F1EC;
+  --ink:#13261C; --ink-2:#3B5045; --muted:#62756B;
+  /* 30 — brand */
+  --green:#006838; --green-700:#00502B; --green-50:#E6F2EB; --green-100:#CBE4D6;
+  --navy:#0054A6; --navy-900:#0A3A73; --navy-50:#EAF1FA; --navy-100:#C9DBF0;
+  /* 10 — critical accents */
+  --red:#E31B23; --red-700:#BA121A; --red-50:#FDEEEF;
+  --gold:#FDB913; --gold-50:#FFF6DC; --gold-ink:#6E4B00;
+  --chrome:#0F1C16; --chrome-2:#1C2D25; --chrome-ink:#DCE8E1;
+
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --f-head:"Public Sans", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r-s:6px; --r-m:10px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:var(--f-body);font-size:15px;line-height:1.5;color:var(--ink);background:var(--white);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+h1,h2,h3,h4{font-family:var(--f-head);text-wrap:balance;margin:0;letter-spacing:-.01em}
+p{margin:0}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+.app{display:flex;flex-direction:column;height:100%;padding-top:env(safe-area-inset-top,0px)}
+
+/* ---------- Prototype bar ---------- */
+.proto{flex:none;background:var(--chrome);color:var(--chrome-ink);font-family:var(--f-head);font-size:13px;
+  padding:8px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;position:relative;z-index:60}
+.proto-id{display:flex;align-items:center;gap:10px;font-weight:600;color:#fff;margin-right:auto;min-width:0}
+.proto-id .dim{color:#8FA59A;font-weight:500}
+.tag-proto{font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#2A1D00;padding:2px 7px;border-radius:3px;font-weight:700}
+.ctl{display:flex;align-items:center;gap:8px}
+.ctl-l{color:#8FA59A;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.seg{display:inline-flex;background:var(--chrome-2);border-radius:var(--r-s);padding:3px;gap:2px}
+.seg button{border:0;background:transparent;color:var(--chrome-ink);padding:5px 11px;border-radius:4px;font-weight:600;font-size:13px}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--ink)}
+.seg button:not([aria-pressed="true"]):hover{background:#2A3E34}
+.proto select{background:var(--chrome-2);color:var(--chrome-ink);border:1px solid #2F4339;border-radius:var(--r-s);padding:5px 8px;font-size:13px;font-family:var(--f-head);max-width:210px}
+
+.views{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;overflow:auto}
+
+/* ---------- Buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:var(--r-s);
+  padding:9px 16px;font-family:var(--f-head);font-weight:700;font-size:14px;line-height:1.2;text-decoration:none;white-space:nowrap}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:var(--green-700)}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:var(--red-700)}
+.btn-ghost{background:#fff;color:var(--green);border-color:var(--green-100)}.btn-ghost:hover{border-color:var(--green)}
+.btn-navy{background:var(--navy);color:#fff}.btn-navy:hover{background:var(--navy-900)}
+.btn-plain{background:#fff;color:var(--ink-2);border-color:var(--line)}.btn-plain:hover{border-color:var(--muted)}
+.btn-sm{padding:6px 11px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---------- Hospital website mock ---------- */
+.wrap{max-width:1160px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.s-strip{background:var(--navy);color:#fff;font-family:var(--f-head);font-size:13px}
+.s-strip .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:7px;flex-wrap:wrap}
+.s-strip .mph{display:flex;align-items:center;gap:8px;font-weight:600;opacity:.95}
+.s-strip .mph i{display:inline-block;width:8px;height:8px;background:var(--gold);border-radius:50%}
+.er-pill{display:inline-flex;align-items:center;gap:7px;background:var(--red);color:#fff;font-weight:700;padding:4px 10px;border-radius:999px;letter-spacing:.01em}
+.s-head{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.s-head .wrap{display:flex;align-items:center;gap:24px;padding-block:14px}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--ink);min-width:0}
+.brand-mark{flex:none;width:40px;height:40px}
+.brand-t{font-family:var(--f-head);font-weight:800;font-size:16px;line-height:1.15;color:var(--green)}
+.brand-t small{display:block;font-weight:600;font-size:12px;color:var(--muted);letter-spacing:.01em}
+.s-nav{display:flex;gap:22px;margin-left:auto;font-family:var(--f-head);font-weight:600;font-size:14px}
+.s-nav a{color:var(--ink-2);text-decoration:none}.s-nav a:hover{color:var(--green)}
+.hero{background:var(--mist);border-bottom:1px solid var(--line)}
+.hero .wrap{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:48px;padding-block:56px 60px;align-items:start}
+.eyebrow{font-family:var(--f-head);font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--green)}
+.hero h1{font-size:clamp(30px,4.2vw,46px);line-height:1.08;margin:12px 0 16px;color:var(--ink);font-weight:800}
+.hero p.lead{font-size:18px;color:var(--ink-2);max-width:34em}
+.hero .acts{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
+.today{background:#fff;border:1px solid var(--line);border-radius:var(--r-m)}
+.today h2{font-size:14px;font-weight:700;padding:14px 18px;border-bottom:1px solid var(--line-2);display:flex;justify-content:space-between;color:var(--ink)}
+.today h2 span{font-weight:500;color:var(--muted)}
+.today dl{margin:0}
+.today .row{display:flex;justify-content:space-between;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line-2);font-size:14.5px}
+.today .row:last-child{border-bottom:0}
+.today dt{color:var(--ink-2)}.today dd{margin:0;font-weight:700;text-align:right}
+.today .row.er dt,.today .row.er dd{color:var(--red-700)}
+.sec{padding-block:52px}
+.sec-h{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.sec h2{font-size:26px;font-weight:800}
+.sec-h a{font-family:var(--f-head);font-weight:700;color:var(--green);text-decoration:none;font-size:14px}
+.svc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.svc div{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 20px}
+.svc h3{font-size:16px;font-weight:700;margin-bottom:4px}
+.svc p{color:var(--muted);font-size:14px}
+.svc .hrs{font-family:var(--f-head);font-size:12px;font-weight:600;color:var(--green);margin-top:8px;letter-spacing:.02em}
+.hmo-strip{background:var(--mist);border-block:1px solid var(--line)}
+.hmo-strip .wrap{padding-block:26px;display:flex;gap:10px 28px;flex-wrap:wrap;align-items:center;font-family:var(--f-head);font-weight:700;color:var(--ink-2)}
+.hmo-strip .lbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:8px}
+.s-foot{background:var(--navy-900);color:#C9D8EC;font-size:14px}
+.s-foot .wrap{padding-block:34px 90px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+.s-foot h4{color:#fff;font-size:14px;margin-bottom:8px}
+.s-foot .note{grid-column:1/-1;border-top:1px solid #23518A;padding-top:16px;font-size:12.5px;color:#9DB4D3}
+
+/* ---------- Chat widget ---------- */
+.cw-launch{position:fixed;right:max(20px,calc(env(safe-area-inset-right,0px) + 12px));bottom:max(20px,calc(env(safe-area-inset-bottom,0px) + 12px));z-index:40;
+  display:flex;align-items:center;gap:10px;background:var(--green);color:#fff;border:0;border-radius:999px;padding:13px 20px 13px 16px;
+  font-family:var(--f-head);font-weight:700;font-size:15px;box-shadow:0 8px 24px rgba(0,60,30,.28)}
+.cw-launch:hover{background:var(--green-700)}
+.cw{position:fixed;right:max(20px,calc(env(safe-area-inset-right,0px) + 12px));bottom:max(20px,calc(env(safe-area-inset-bottom,0px) + 12px));z-index:50;
+  width:392px;height:min(660px,calc(100% - var(--proto-h,52px) - 40px));display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);
+  border-radius:14px;overflow:hidden;box-shadow:0 22px 60px rgba(8,40,24,.20),0 2px 8px rgba(8,40,24,.08)}
+.cw-head{background:var(--green);color:#fff;display:flex;align-items:center;gap:11px;padding:12px 12px 12px 14px}
+.cw-av{flex:none;width:36px;height:36px;border-radius:50%;background:#fff;display:grid;place-items:center}
+.cw-ttl{min-width:0;flex:1}
+.cw-ttl b{display:block;font-family:var(--f-head);font-size:15.5px;font-weight:700;line-height:1.2}
+.cw-ttl span{display:flex;align-items:center;gap:6px;font-size:12.5px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cw-ttl span i{flex:none;width:7px;height:7px;border-radius:50%;background:#7DE0A6}
+.cw-lang{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:var(--r-s);font-size:12.5px;font-family:var(--f-head);font-weight:600;padding:4px 4px}
+.cw-lang option{color:var(--ink)}
+.cw-x{flex:none;width:32px;height:32px;border:0;border-radius:var(--r-s);background:transparent;color:#fff;display:grid;place-items:center}
+.cw-x:hover{background:rgba(255,255,255,.14)}
+.cw-er{display:flex;align-items:center;gap:8px;background:var(--red-50);color:var(--red-700);border-bottom:1px solid #F7D3D5;padding:7px 14px;font-size:13px;font-family:var(--f-head);font-weight:600}
+.cw-er b{font-weight:800;color:var(--red)}
+.cw-body{flex:1;overflow-y:auto;background:var(--mist);padding:16px 14px 10px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.msg{max-width:86%;display:flex;flex-direction:column;gap:3px;min-width:0}
+.msg.bot{align-self:flex-start}.msg.user{align-self:flex-end}.msg.wide{max-width:100%;width:100%}
+.msg.staff{align-self:flex-start}
+.who{font-family:var(--f-head);font-size:11.5px;font-weight:700;color:var(--navy);letter-spacing:.02em;padding-left:2px}
+.bubble{padding:9px 12px;border-radius:12px;font-size:14.5px;line-height:1.45;overflow-wrap:anywhere}
+.bot .bubble{background:#fff;border:1px solid var(--line);border-top-left-radius:4px}
+.user .bubble{background:var(--green);color:#fff;border-top-right-radius:4px}
+.staff .bubble{background:var(--navy-50);border:1px solid var(--navy-100);border-top-left-radius:4px}
+.bubble p+p,.bubble p+ul,.bubble ul+p{margin-top:6px}
+.bubble ul{margin:4px 0 0;padding-left:18px}
+.bubble li{margin:1px 0}
+.sys{align-self:center;text-align:center;font-size:12.5px;color:var(--muted);max-width:92%;padding:2px 0}
+.sys a,.sys button.lnk{color:var(--navy);font-weight:700}
+.sys.wait{display:flex;align-items:center;gap:8px;background:var(--gold-50);color:var(--gold-ink);border:1px solid #F4DE9E;border-radius:999px;padding:5px 12px;font-family:var(--f-head);font-weight:600}
+.typing{align-self:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px;border-top-left-radius:4px;padding:11px 13px;display:flex;gap:4px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--muted);opacity:.5;animation:dot 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-2px)}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding-top:2px}
+.chips:empty{display:none}
+.chip{border:1px solid var(--green-100);background:#fff;color:var(--green);border-radius:999px;padding:6px 12px;font-size:13.5px;font-weight:700;font-family:var(--f-head);line-height:1.25}
+.chip:hover{border-color:var(--green);background:var(--green-50)}
+.chip.red{border-color:#F3B9BC;color:var(--red-700)}
+.chip.red:hover{background:var(--red-50);border-color:var(--red)}
+
+/* cards inside chat */
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden;width:100%}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--line-2);font-family:var(--f-head);font-size:13px;font-weight:700;color:var(--ink)}
+.live{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:11.5px;color:var(--green)}
+.live i{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.card.done{opacity:.72}
+.card.done .btn,.card.done .chip,.card.done .slot{pointer-events:none}
+.doc{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:11px;padding:12px 13px;border-bottom:1px solid var(--line-2);align-items:start}
+.doc:last-child{border-bottom:0}
+.doc-av{width:38px;height:38px;border-radius:50%;background:var(--navy-50);color:var(--navy);display:grid;place-items:center;font-family:var(--f-head);font-weight:700;font-size:13px}
+.doc-name{font-family:var(--f-head);font-weight:700;font-size:14px;line-height:1.25}
+.doc-sub{color:var(--muted);font-size:13px}
+.doc-meta{margin:6px 0 0;display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font-size:12.5px}
+.doc-meta dt{color:var(--muted)}.doc-meta dd{margin:0;color:var(--ink)}
+.doc .btn{margin-top:2px}
+.er-card{background:var(--red-50);border:1px solid #F3B9BC;border-radius:var(--r-m);padding:14px}
+.er-card h4{color:var(--red-700);font-size:15.5px;font-weight:800;display:flex;gap:8px;align-items:center}
+.er-card p{margin-top:6px;font-size:14px}
+.er-num{display:block;margin-top:10px;font-family:var(--f-head);font-weight:800;font-size:24px;color:var(--red);letter-spacing:.01em;user-select:all}
+.er-card .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.er-card .btn-plain{border-color:#F3B9BC;color:var(--red-700)}
+.cbody{padding:12px 13px;font-size:14px}
+.cbody p+p{margin-top:8px}
+.cbody details{margin-top:8px;font-size:13px;color:var(--ink-2)}
+.cbody summary{cursor:pointer;color:var(--navy);font-weight:700;font-family:var(--f-head);font-size:13px}
+.cbody details ul{padding-left:18px;margin:6px 0 0}
+.cacts{display:flex;gap:8px;flex-wrap:wrap;padding:0 13px 13px}
+.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:12px 13px}
+.slot{border:1px solid var(--green-100);background:#fff;color:var(--green);border-radius:var(--r-s);padding:7px 4px;font-family:var(--f-head);font-weight:700;font-size:13px}
+.slot:hover:not(:disabled){background:var(--green-50);border-color:var(--green)}
+.slot:disabled{color:#A9B7B0;border-color:var(--line-2);background:var(--mist);text-decoration:line-through;cursor:not-allowed}
+.slot.sel{background:var(--green);color:#fff;border-color:var(--green)}
+.slot-key{display:flex;gap:14px;padding:0 13px 11px;font-size:12px;color:var(--muted)}
+.form .fbody{padding:12px 13px;display:flex;flex-direction:column;gap:10px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld label,.fld legend{font-family:var(--f-head);font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.fld input,.fld select{border:1px solid var(--line);border-radius:var(--r-s);padding:8px 10px;font-size:14.5px;background:#fff;width:100%;min-width:0}
+.fld input:focus,.fld select:focus{outline:2px solid var(--green-100);border-color:var(--green)}
+.fld input[aria-invalid="true"]{border-color:var(--red)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+fieldset.fld{border:0;padding:0;margin:0}
+.radios{display:flex;gap:6px}
+.radios label{flex:1;display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:var(--r-s);padding:7px 9px;font-family:var(--f-body);font-weight:400;font-size:14px;color:var(--ink);cursor:pointer}
+.radios input{accent-color:var(--green);margin:0}
+.ferr{color:var(--red-700);font-size:13px;font-weight:700}
+.factions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.demo-lnk{border:0;background:none;padding:0;color:var(--muted);font-size:12.5px;text-decoration:underline dashed;text-underline-offset:3px;font-family:var(--f-head);font-weight:600}
+.demo-lnk::before{content:"Demo · ";color:var(--gold-ink)}
+.demo-note{font-size:12px;color:var(--gold-ink);background:var(--gold-50);border-radius:4px;padding:4px 8px;font-family:var(--f-head);font-weight:600;align-self:flex-start}
+.kv{margin:0;padding:4px 13px 8px}
+.kv div{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;padding:6px 0;border-bottom:1px solid var(--line-2);font-size:13.5px}
+.kv div:last-child{border-bottom:0}
+.kv dt{color:var(--muted)}.kv dd{margin:0;font-weight:700}
+.ok-h{display:flex;align-items:center;gap:9px;padding:12px 13px;background:var(--green-50);color:var(--green);font-family:var(--f-head);font-weight:800;font-size:15px;border-bottom:1px solid var(--green-100)}
+.ok-h svg{background:var(--green);color:#fff;border-radius:50%;padding:3px}
+.refno{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:11px 13px 3px}
+.refno span{font-size:12.5px;color:var(--muted)}
+.refno strong{font-family:var(--f-mono);font-size:16px;letter-spacing:.02em;user-select:all}
+.cnote{margin:0 13px 10px;padding:8px 10px;border-radius:var(--r-s);background:var(--mist);font-size:13px;color:var(--ink-2)}
+.cnote.gold{background:var(--gold-50);color:var(--gold-ink)}
+.hms{display:flex;align-items:center;gap:6px;padding:9px 13px;border-top:1px solid var(--line-2);font-size:12px;color:var(--green);font-family:var(--f-head);font-weight:700}
+.otp-in{font-family:var(--f-mono);font-size:20px!important;letter-spacing:.35em;text-align:center}
+.rec-sec{padding:10px 13px;border-bottom:1px solid var(--line-2)}
+.rec-sec:last-of-type{border-bottom:0}
+.rec-sec h5{margin:0 0 6px;font-family:var(--f-head);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.rec-row{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:3px 0}
+.pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--f-head);font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;line-height:1.5}
+.p-green{background:var(--green-50);color:var(--green)}
+.p-gold{background:var(--gold-50);color:var(--gold-ink)}
+.p-navy{background:var(--navy-50);color:var(--navy)}
+.p-red{background:var(--red-50);color:var(--red-700)}
+.p-grey{background:#EEF2F0;color:var(--muted)}
+
+.cw-comp{border-top:1px solid var(--line);background:#fff;padding:10px 10px 6px}
+.cw-in{display:flex;align-items:flex-end;gap:6px}
+.cw-in textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:var(--r-m);padding:9px 11px;font-size:14.5px;line-height:1.4;max-height:96px;min-height:40px;background:var(--mist)}
+.cw-in textarea:focus{outline:none;border-color:var(--green);background:#fff}
+.ib{flex:none;width:40px;height:40px;border-radius:var(--r-m);border:1px solid var(--line);background:#fff;color:var(--ink-2);display:grid;place-items:center}
+.ib:hover{border-color:var(--green);color:var(--green)}
+.ib.send{background:var(--green);border-color:var(--green);color:#fff}
+.ib.send:hover{background:var(--green-700);color:#fff}
+.ib.rec{background:var(--red-50);border-color:var(--red);color:var(--red)}
+.listen{display:flex;align-items:center;gap:10px;height:40px;flex:1;padding:0 12px;border:1px solid var(--red);border-radius:var(--r-m);background:var(--red-50);color:var(--red-700);font-family:var(--f-head);font-weight:700;font-size:13.5px}
+.bars{display:flex;gap:3px;align-items:center;height:16px}
+.bars i{width:3px;height:6px;background:var(--red);border-radius:2px;animation:bar .8s ease-in-out infinite}
+.bars i:nth-child(2){animation-delay:.1s}.bars i:nth-child(3){animation-delay:.2s}.bars i:nth-child(4){animation-delay:.3s}
+@keyframes bar{50%{height:16px}}
+.cw-foot{display:flex;justify-content:space-between;gap:8px;padding:6px 3px 0;font-size:11.5px;color:var(--muted)}
+.cw-foot button{border:0;background:none;padding:0;color:var(--navy);font-weight:700;font-size:11.5px;font-family:var(--f-head)}
+
+/* ---------- Staff panel ---------- */
+.staff{display:flex;flex-direction:column;height:100%;background:var(--mist)}
+.st-bar{flex:none;background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;
+  padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px))}
+.st-bar .brand-t{color:#fff;font-size:15px}
+.st-bar .brand-t small{color:#BFD3EC}
+.st-user{margin-left:auto;display:flex;align-items:center;gap:10px;font-family:var(--f-head);font-size:13px}
+.st-user .av{width:32px;height:32px;border-radius:50%;background:#fff;color:var(--navy);display:grid;place-items:center;font-weight:800;font-size:12px}
+.st-user small{display:block;color:#BFD3EC;font-weight:500}
+.st-grid{flex:1;min-height:0;display:grid;grid-template-columns:228px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.side{background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;overflow:auto}
+.side nav{display:flex;flex-direction:column;padding:12px 10px;gap:2px}
+.nv{display:flex;align-items:center;gap:10px;border:0;background:none;text-align:left;padding:9px 10px;border-radius:var(--r-s);font-family:var(--f-head);font-weight:600;font-size:14px;color:var(--ink-2);white-space:nowrap}
+.nv:hover{background:var(--mist)}
+.nv[aria-current="page"]{background:var(--green-50);color:var(--green)}
+.nv .cnt{margin-left:auto;background:var(--gold);color:#2A1D00;font-size:11.5px;font-weight:800;border-radius:999px;padding:0 7px;line-height:19px}
+.nv .lk{margin-left:auto;color:var(--muted)}
+.side-foot{margin-top:auto;padding:14px 16px;border-top:1px solid var(--line-2);font-size:13px}
+.side-foot h4{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.chn{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0}
+.chn span:first-child{display:flex;align-items:center;gap:7px;color:var(--ink-2)}
+.st-main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.pg-h{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 24px 14px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pg-h h2{font-size:20px;font-weight:800}
+.pg-h p{color:var(--muted);font-size:13.5px;margin-top:2px}
+.metrics{display:flex;gap:6px 30px;flex-wrap:wrap}
+.metric b{display:block;font-family:var(--f-head);font-size:20px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.metric span{font-size:12px;color:var(--muted)}
+.metric.warn b{color:var(--gold-ink)}
+.metric.crit b{color:var(--red-700)}
+
+.split{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.lst{background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.filters{display:flex;flex-wrap:wrap;gap:4px;padding:10px 12px;border-bottom:1px solid var(--line-2);flex:none}
+.flt{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-family:var(--f-head);font-weight:600;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.flt[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.items{overflow-y:auto;flex:1}
+.it{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:4px 10px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line-2);background:#fff;padding:12px 14px;position:relative}
+.it:hover{background:var(--mist)}
+.it[aria-current="true"]{background:var(--green-50)}
+.it[aria-current="true"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--green)}
+.it .av{grid-row:span 2;width:34px;height:34px;border-radius:50%;background:var(--navy-50);color:var(--navy);display:grid;place-items:center;font-family:var(--f-head);font-weight:700;font-size:12px}
+.it .nm{font-family:var(--f-head);font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.it .tm{font-size:12px;color:var(--muted);text-align:right}
+.it .pv{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .tg{grid-column:2/4;display:flex;gap:5px;flex-wrap:wrap;margin-top:3px}
+.ch-ic{display:inline-flex;color:var(--muted)}
+.det{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--mist)}
+.det-h{flex:none;display:flex;align-items:center;gap:12px;padding:12px 20px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.det-h h3{font-size:16px;font-weight:800}
+.det-h .sub{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.det-h .acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.back{display:none;border:0;background:none;padding:4px;color:var(--ink-2)}
+.trans{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+.tm-row{display:flex;flex-direction:column;gap:3px;max-width:min(560px,82%)}
+.tm-row.patient{align-self:flex-start}
+.tm-row.assistant,.tm-row.staff{align-self:flex-end;align-items:flex-end}
+.tm-row .lb{font-family:var(--f-head);font-size:11.5px;font-weight:700;color:var(--muted);display:flex;gap:6px}
+.tm-row .bb{padding:9px 12px;border-radius:12px;font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.tm-row.patient .bb{background:#fff;border:1px solid var(--line);border-top-left-radius:4px}
+.tm-row.assistant .bb{background:var(--green-50);border:1px solid var(--green-100);border-top-right-radius:4px}
+.tm-row.staff .bb{background:var(--navy-50);border:1px solid var(--navy-100);border-top-right-radius:4px}
+.tm-row .bb.card-log{font-style:italic;color:var(--ink-2)}
+.tm-ev{align-self:center;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px;font-family:var(--f-head);font-weight:600}
+.tm-ev::before,.tm-ev::after{content:"";width:28px;height:1px;background:var(--line)}
+.tm-ev.crit{color:var(--red-700)}
+.tm-ev.priv{color:var(--green)}
+.composer{flex:none;border-top:1px solid var(--line);background:#fff;padding:12px 20px;display:flex;gap:8px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:var(--r-s);padding:9px 11px;min-height:42px;max-height:120px;font-size:14px}
+.composer textarea:disabled{background:var(--mist)}
+.composer-note{flex:1;font-size:13.5px;color:var(--muted);align-self:center}
+.empty{margin:auto;text-align:center;color:var(--muted);padding:40px 20px;max-width:360px}
+.empty h3{color:var(--ink);font-size:16px;margin-bottom:6px}
+
+/* answers editor */
+.kb-it .ttl{font-family:var(--f-head);font-weight:700;font-size:14px}
+.kb-it .meta{font-size:12.5px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+.search{padding:10px 12px;border-bottom:1px solid var(--line-2);flex:none}
+.search label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:var(--r-s);padding:0 10px;color:var(--muted)}
+.search input{border:0;outline:0;padding:8px 0;flex:1;min-width:0;background:transparent}
+.ed{flex:1;min-height:0;overflow-y:auto;padding:20px 24px 28px;display:flex;flex-direction:column;gap:18px}
+.ed-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.ed-top h3{font-size:20px;font-weight:800}
+.ed-top p{font-size:13px;color:var(--muted);margin-top:3px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:var(--r-m)}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line-2);font-family:var(--f-head);font-size:13px;font-weight:700;flex-wrap:wrap}
+.panel-b{padding:14px}
+.asks{display:flex;flex-wrap:wrap;gap:6px}
+.ask{background:var(--mist);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:13.5px}
+.tabs{display:flex;gap:2px}
+.tab{border:0;background:none;padding:5px 10px;border-radius:4px;font-family:var(--f-head);font-weight:700;font-size:12.5px;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--green-50);color:var(--green)}
+.ed textarea{width:100%;min-height:190px;border:1px solid var(--line);border-radius:var(--r-s);padding:11px 12px;font-size:14.5px;line-height:1.55;resize:vertical}
+.ed textarea:focus{outline:2px solid var(--green-100);border-color:var(--green)}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+.prev{background:var(--mist);border-radius:var(--r-s);padding:14px}
+.prev .bubble{background:#fff;border:1px solid var(--line);border-radius:12px;border-top-left-radius:4px;max-width:360px}
+.ed-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ed-acts .saved{font-size:13px;color:var(--green);font-family:var(--f-head);font-weight:700}
+.ed-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr);gap:18px;align-items:start}
+
+/* tables */
+.pad{padding:20px 24px;overflow:auto;flex:1}
+.tbl-w{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:var(--r-m)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:760px}
+th{text-align:left;font-family:var(--f-head);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:10px 14px;border-bottom:1px solid var(--line);background:#FBFDFC}
+td{padding:11px 14px;border-bottom:1px solid var(--line-2);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td small{display:block;color:var(--muted);font-size:12.5px}
+tr.new td{background:#FBFFF9}
+
+/* reports */
+.rp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.rp .wide{grid-column:1/-1}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.kpi{padding:16px 18px;border-right:1px solid var(--line-2)}
+.kpi:last-child{border-right:0}
+.kpi b{display:block;font-family:var(--f-head);font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
+.kpi span{font-size:12.5px;color:var(--muted)}
+.kpi em{display:block;font-style:normal;font-size:12px;color:var(--green);font-family:var(--f-head);font-weight:700;margin-top:4px}
+.hbar{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr) 44px;gap:10px;align-items:center;padding:6px 0;font-size:13.5px}
+.hbar .tr{height:10px;background:var(--line-2);border-radius:2px;overflow:hidden}
+.hbar .tr i{display:block;height:100%;background:var(--green);border-radius:2px}
+.hbar b{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--f-head);font-size:13px}
+.cols{display:flex;align-items:flex-end;gap:14px;height:150px;padding:10px 4px 0;border-bottom:1px solid var(--line)}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%}
+.col i{width:100%;max-width:46px;background:var(--navy);border-radius:2px 2px 0 0}
+.col i.last{background:var(--green)}
+.col b{font-family:var(--f-head);font-size:12.5px;font-variant-numeric:tabular-nums}
+.col-l{display:flex;gap:14px;padding:6px 4px 0}
+.col-l span{flex:1;text-align:center;font-size:12px;color:var(--muted)}
+.stack{display:flex;height:14px;border-radius:3px;overflow:hidden;margin:8px 0 10px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:2px}
+
+.locked{margin:40px auto;max-width:460px;background:#fff;border:1px solid var(--line);border-radius:var(--r-m);padding:26px}
+.locked .pill{margin-bottom:12px}
+.locked h3{font-size:18px;font-weight:800;margin-bottom:8px}
+.locked p{color:var(--ink-2);font-size:14.5px}
+.locked ul{margin:12px 0 18px;padding-left:18px;color:var(--ink-2);font-size:14px}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:max(24px,calc(env(safe-area-inset-bottom,0px) + 16px));transform:translateX(-50%);z-index:90;background:var(--ink);color:#fff;
+  padding:10px 16px;border-radius:var(--r-s);font-family:var(--f-head);font-weight:600;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:calc(100% - 32px)}
+
+/* ---------- Responsive ---------- */
+@media (max-width:1020px){
+  .s-nav{display:none}
+  .hero .wrap{grid-template-columns:1fr;gap:28px}
+  .svc{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ed-grid{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .rp{grid-template-columns:1fr}
+}
+@media (max-width:900px){
+  .st-grid{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .side{border-right:0;border-bottom:1px solid var(--line);overflow:visible}
+  .side nav{flex-direction:row;overflow-x:auto;padding:8px 10px}
+  .side-foot{display:none}
+  .split{grid-template-columns:1fr}
+  .split.has-sel .lst{display:none}
+  .split:not(.has-sel) .det{display:none}
+  .back{display:inline-flex}
+  .split.kb{grid-template-rows:auto minmax(0,1fr)}
+  .split.kb .lst{display:flex!important;max-height:210px;border-right:0;border-bottom:1px solid var(--line)}
+  .split.kb .det{display:flex!important}
+  .st-user div{display:none}
+}
+@media (max-width:640px){
+  .proto-id .dim{display:none}
+  .ctl-l{display:none}
+  .s-head .btn{display:none}
+  .svc{grid-template-columns:1fr}
+  .s-foot .wrap{grid-template-columns:1fr}
+  .cw{left:0;right:0;top:var(--proto-h,52px);bottom:0;width:auto;height:auto;border-radius:0;border:0}
+  .pg-h,.pad,.ed,.trans{padding-left:16px;padding-right:16px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{border-bottom:1px solid var(--line-2)}
+  .frow{grid-template-columns:1fr}
+  .hbar{grid-template-columns:110px minmax(0,1fr) 40px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Prototype controls (not part of the product) -->
+  <div class="proto" role="region" aria-label="Prototype controls">
+    <div class="proto-id"><span class="tag-proto">Prototype</span><span>LUDHMC Care Assistant</span><span class="dim">Standard package · Q-2026-001</span></div>
+    <div class="ctl"><span class="ctl-l">View</span>
+      <div class="seg" id="seg-view">
+        <button type="button" data-view="patient" aria-pressed="true">Patient website</button>
+        <button type="button" data-view="staff" aria-pressed="false">Staff panel</button>
+      </div>
+    </div>
+    <div class="ctl" id="ctl-scn">
+      <label class="sr" for="scenario">Run a scenario</label>
+      <select id="scenario">
+        <option value="">Try a scenario…</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="views">
+    <!-- ================= PATIENT WEBSITE ================= -->
+    <section class="view" id="v-patient" aria-label="Hospital website with chat assistant">
+      <div class="s-strip"><div class="wrap">
+        <span class="mph"><i></i>A Metro Pacific Health hospital</span>
+        <span class="er-pill" id="strip-er"></span>
+      </div></div>
+      <header class="s-head"><div class="wrap">
+        <a class="brand" href="#patient" aria-label="Lucena United Doctors Hospital and Medical Center home">
+          <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="8" fill="#006838"/><path d="M16 9h8v7h7v8h-7v7h-8v-7H9v-8h7z" fill="#fff"/><circle cx="20" cy="20" r="2.4" fill="#E31B23"/></svg>
+          <span class="brand-t">Lucena United Doctors Hospital<small>and Medical Center · Lucena City</small></span>
+        </a>
+        <nav class="s-nav" aria-label="Website">
+          <a href="#patient">Find a Doctor</a><a href="#patient">Services</a><a href="#patient">Patients &amp; Visitors</a><a href="#patient">HMO Partners</a><a href="#patient">Contact</a>
+        </nav>
+        <button type="button" class="btn btn-red" data-site="book">Book appointment</button>
+      </div></header>
+
+      <section class="hero"><div class="wrap">
+        <div>
+          <div class="eyebrow">Lucena City, Quezon</div>
+          <h1>Questions about your visit? Ask us any time.</h1>
+          <p class="lead">Our Care Assistant answers in English, Filipino or Taglish, shows doctors’ clinic schedules, and books your consultation in a few steps.</p>
+          <div class="acts">
+            <button type="button" class="btn btn-green" data-site="open">Ask the Care Assistant</button>
+            <button type="button" class="btn btn-ghost" data-site="doctor">Find a doctor</button>
+          </div>
+        </div>
+        <aside class="today" aria-label="Hours today">
+          <h2>Hours today <span id="today-date"></span></h2>
+          <dl>
+            <div class="row er"><dt>Emergency Room</dt><dd>Open 24 hours</dd></div>
+            <div class="row"><dt>Out-patient clinics</dt><dd>8:00 AM – 5:00 PM</dd></div>
+            <div class="row"><dt>Visiting hours</dt><dd id="today-visit">10:00 AM – 8:00 PM</dd></div>
+            <div class="row"><dt>Laboratory</dt><dd>Open 24 hours</dd></div>
+            <div class="row"><dt>Result release</dt><dd>7:00 AM – 7:00 PM</dd></div>
+          </dl>
+        </aside>
+      </div></section>
+
+      <section class="sec"><div class="wrap">
+        <div class="sec-h"><h2>Services</h2><a href="#patient">All services</a></div>
+        <div class="svc">
+          <div><h3>Emergency Room</h3><p>Adult and pediatric emergency care with on-site specialists.</p><div class="hrs">24 hours, every day</div></div>
+          <div><h3>Laboratory &amp; Blood Bank</h3><p>Routine and special tests, with same-day results for most.</p><div class="hrs">24 hours · release 7 AM – 7 PM</div></div>
+          <div><h3>Imaging</h3><p>X-ray, ultrasound and CT scan with radiologist reading.</p><div class="hrs">Mon – Sat, 7 AM – 7 PM</div></div>
+          <div><h3>Heart Station</h3><p>ECG, 2D echo and treadmill stress test.</p><div class="hrs">Mon – Sat, 8 AM – 5 PM</div></div>
+          <div><h3>Dialysis Center</h3><p>Hemodialysis by appointment, PhilHealth accredited.</p><div class="hrs">Mon – Sat, 6 AM – 10 PM</div></div>
+          <div><h3>Maternity &amp; Newborn</h3><p>Prenatal clinics, delivery rooms and newborn screening.</p><div class="hrs">24 hours</div></div>
+        </div>
+      </div></section>
+
+      <div class="hmo-strip"><div class="wrap">
+        <span class="lbl">HMO partners</span><span>Maxicare</span><span>Intellicare</span><span>MediCard</span><span>PhilCare</span><span>Cocolife</span><span>Avega</span><span>Pacific Cross</span><span>ValuCare</span>
+      </div></div>
+
+      <footer class="s-foot"><div class="wrap">
+        <div><h4>Lucena United Doctors Hospital and Medical Center</h4><p>Brgy. Isabang, Lucena City, Quezon 4301</p></div>
+        <div><h4>Contact</h4><p>Emergency: <span id="foot-er"></span><br>Patient Relations: (042) 555-0101<br>Out-patient: (042) 555-0102</p></div>
+        <div><h4>Metro Pacific Health</h4><p>Part of the Metro Pacific Health network of hospitals.</p></div>
+        <p class="note">Prototype only. Phone numbers, rates, doctors and schedules are sample data for demonstration and will be replaced with the hospital’s information.</p>
+      </div></footer>
+
+      <button type="button" class="cw-launch" id="cw-launch" hidden>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>
+        <span data-i18n="launch">Ask the Care Assistant</span>
+      </button>
+
+      <div class="cw" id="cw" role="dialog" aria-label="Care Assistant chat">
+        <div class="cw-head">
+          <div class="cw-av" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 40 40"><path d="M16 7h8v9h9v8h-9v9h-8v-9H7v-8h9z" fill="#006838"/></svg></div>
+          <div class="cw-ttl"><b>Care Assistant</b><span id="cw-status"><i></i><span data-i18n="online">Replies instantly · LUDHMC</span></span></div>
+          <label class="sr" for="cw-lang">Language</label>
+          <select class="cw-lang" id="cw-lang">
+            <option value="en">English</option>
+            <option value="fil">Filipino</option>
+            <option value="tl">Taglish</option>
+          </select>
+          <button type="button" class="cw-x" id="cw-min" aria-label="Minimize chat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+        </div>
+        <div class="cw-er" id="cw-er"></div>
+        <div class="cw-body" id="cw-body" aria-live="polite">
+          <div class="chips" id="cw-chips"></div>
+        </div>
+        <form class="cw-comp" id="cw-form" autocomplete="off">
+          <div class="cw-in" id="cw-in">
+            <label class="sr" for="cw-text">Message</label>
+            <textarea id="cw-text" rows="1" placeholder="Type your question…"></textarea>
+            <button type="button" class="ib" id="cw-mic" aria-label="Speak your question" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+            <button type="submit" class="ib send" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+          <div class="cw-foot"><span data-i18n="disclaimer">Not for medical advice or diagnosis.</span><button type="button" id="cw-priv" data-i18n="privacy">Privacy notice</button></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ================= STAFF PANEL ================= -->
+    <section class="view" id="v-staff" aria-label="Staff panel" hidden>
+      <div class="staff">
+        <div class="st-bar">
+          <span class="brand">
+            <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true" style="width:32px;height:32px"><rect width="40" height="40" rx="8" fill="#fff"/><path d="M16 9h8v7h7v8h-7v7h-8v-7H9v-8h7z" fill="#006838"/></svg>
+            <span class="brand-t">Care Assistant<small>LUDHMC · Staff panel</small></span>
+          </span>
+          <div class="st-user"><div><b>Joanna Reyes</b><small>Patient Relations</small></div><span class="av">JR</span></div>
+        </div>
+        <div class="st-grid">
+          <aside class="side">
+            <nav aria-label="Staff panel" id="st-nav"></nav>
+            <div class="side-foot" id="st-chan"></div>
+          </aside>
+          <main class="st-main" id="st-main"></main>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+'use strict';
+/* =========================================================
+   Helpers
+   ========================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait = ms => new Promise(r => setTimeout(r, REDUCE ? Math.min(ms, 120) : ms));
+const el = html => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+let _u = 0; const uid = () => 'u' + (++_u);
+
+const ICON = {
+  send: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  alert: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
+  msgr: '<path d="M12 3C7 3 3 6.7 3 11.3c0 2.6 1.3 4.9 3.3 6.4V21l3-1.7c.9.3 1.8.4 2.7.4 5 0 9-3.7 9-8.4S17 3 12 3z"/><path d="M7.5 13l3-3 2.5 2 3.5-3"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  cal: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  book: '<path d="M6 4h9a3 3 0 0 1 3 3v13H9a3 3 0 0 1-3-3z"/><path d="M6 17a3 3 0 0 1 3-3h9"/>',
+  chart: '<path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/>',
+  db: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>'
+};
+const icon = (n, s = 16, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+
+/* =========================================================
+   Sample hospital data (placeholders)
+   ========================================================= */
+const ER = '(042) 555-0100', PR = '(042) 555-0101', OPD = '(042) 555-0102';
+const ER_TEL = 'tel:+63425550100';
+
+const SPECS = ['Cardiology', 'Pediatrics', 'OB-GYN', 'Internal Medicine', 'Orthopedics', 'ENT', 'Ophthalmology', 'Dermatology'];
+const DOCS = [
+  { id: 1, name: 'Dr. Ramon C. Villanueva', spec: 'Cardiology', sub: 'Adult cardiology', days: [1, 3, 5], s: 540, e: 720, room: 'Room 305, Medical Arts Bldg.' },
+  { id: 2, name: 'Dr. Teresa M. Dela Cruz', spec: 'Cardiology', sub: 'Non-invasive cardiology', days: [2, 4], s: 780, e: 960, room: 'Room 306, Medical Arts Bldg.' },
+  { id: 3, name: 'Dr. Paolo R. Mendoza', spec: 'Pediatrics', sub: 'General pediatrics', days: [1, 2, 3, 4, 5, 6], s: 600, e: 720, room: 'Room 210, Medical Arts Bldg.' },
+  { id: 4, name: 'Dr. Kristine A. Salazar', spec: 'Pediatrics', sub: 'Pediatric pulmonology', days: [2, 4, 6], s: 840, e: 1020, room: 'Room 211, Medical Arts Bldg.' },
+  { id: 5, name: 'Dr. Maria Lourdes T. Aquino', spec: 'OB-GYN', sub: 'Obstetrics and gynecology', days: [1, 3, 5], s: 780, e: 960, room: 'Room 401, Medical Arts Bldg.' },
+  { id: 6, name: 'Dr. Jose Emmanuel P. Robles', spec: 'Internal Medicine', sub: 'General internal medicine', days: [1, 2, 3, 4, 5], s: 480, e: 660, room: 'Room 302, Medical Arts Bldg.' },
+  { id: 7, name: 'Dr. Angela F. Navarro', spec: 'Internal Medicine', sub: 'Endocrinology, diabetes', days: [2, 4], s: 540, e: 720, room: 'Room 303, Medical Arts Bldg.' },
+  { id: 8, name: 'Dr. Carlo B. Lim', spec: 'Orthopedics', sub: 'Bone and joint surgery', days: [3, 6], s: 540, e: 720, room: 'Room 215, Medical Arts Bldg.' },
+  { id: 9, name: 'Dr. Rhea S. Castillo', spec: 'ENT', sub: 'Ear, nose and throat', days: [1, 4], s: 840, e: 1020, room: 'Room 218, Medical Arts Bldg.' },
+  { id: 10, name: 'Dr. Miguel L. Santos', spec: 'Ophthalmology', sub: 'Eye care and cataract', days: [2, 5], s: 540, e: 720, room: 'Room 220, Medical Arts Bldg.' },
+  { id: 11, name: 'Dr. Bianca V. Ramos', spec: 'Dermatology', sub: 'Skin, hair and nails', days: [6], s: 540, e: 780, room: 'Room 222, Medical Arts Bldg.' }
+];
+const HMOS = ['Maxicare', 'Intellicare', 'MediCard', 'PhilCare', 'Cocolife Healthcare', 'Avega', 'Pacific Cross', 'ValuCare'];
+const DAYN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const fmtT = m => { const h = Math.floor(m / 60), mm = m % 60; return `${((h + 11) % 12) + 1}:${String(mm).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const fmtD = d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const daysLbl = ds => ds.length === 6 ? 'Mon – Sat' : ds.length === 5 && ds[0] === 1 && ds[4] === 5 ? 'Mon – Fri' : ds.map(d => DAYN[d]).join(', ');
+const initials = n => n.replace(/^Dr\.\s*/, '').split(' ').filter(w => /^[A-Z]/.test(w) && !/\.$/.test(w)).map(w => w[0]).slice(0, 2).join('');
+const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+function nextDates(doc, n = 4, from = 1) {
+  const out = [], base = today0();
+  for (let i = from; i <= 35 && out.length < n; i++) { const x = new Date(base); x.setDate(base.getDate() + i); if (doc.days.includes(x.getDay())) out.push(x); }
+  return out;
+}
+function slots(doc, date) {
+  const out = [];
+  for (let m = doc.s, i = 0; m < doc.e; m += 30, i++) out.push({ m, label: fmtT(m), taken: ((i * 5 + date.getDate() * 3 + doc.id) % 4) === 0 });
+  return out;
+}
+const yymmdd = d => String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+const maskMobile = m => { const d = m.replace(/\D/g, '').replace(/^63/, '0'); return d.slice(0, 4) + ' ••• ' + d.slice(-4); };
+const nowT = () => new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+/* Knowledge base: what staff edit in the panel and what the assistant answers with */
+const KB = [
+  { id: 'visiting', title: 'Visiting hours', cat: 'Patients & visitors', count: 412, upd: 'Nov 12 · J. Reyes',
+    asks: ['What are the visiting hours?', 'Anong oras pwede dumalaw?', 'Pwede po ba magdala ng bata?'],
+    en: 'Visiting hours are 10:00 AM to 8:00 PM, every day.\n- Two visitors per patient at a time\n- ICU: 11:00 AM to 12:00 NN and 5:00 to 6:00 PM, one visitor only\n- Children under 12 are not allowed in patient rooms\nPlease bring a valid ID and get a visitor pass at the main lobby.',
+    fil: 'Ang oras ng pagdalaw ay 10:00 AM hanggang 8:00 PM, araw-araw.\n- Dalawang bisita bawat pasyente sa isang pagkakataon\n- ICU: 11:00 AM hanggang 12:00 NN at 5:00 hanggang 6:00 PM, isang bisita lang\n- Hindi pinapayagan ang batang wala pang 12 taong gulang sa kuwarto ng pasyente\nMagdala ng valid ID at kumuha ng visitor pass sa main lobby.' },
+  { id: 'rooms', title: 'Room rates', cat: 'Admission & billing', count: 301, upd: 'Nov 3 · Billing',
+    asks: ['How much is a private room?', 'Magkano po ang kwarto?', 'Room rate ng ward'],
+    en: 'Room rates per day (room only; doctors’ fees, medicines and tests are separate):\n- Ward, 4 beds: ₱1,800\n- Semi-private, 2 beds: ₱3,200\n- Private: ₱4,500\n- Deluxe private: ₱6,200\n- ICU: ₱8,500\nPhilHealth and HMO coverage depend on your plan. For an estimate, call Billing at (042) 555-0104.',
+    fil: 'Presyo ng kuwarto bawat araw (kuwarto lang; hiwalay ang professional fee ng doktor, gamot at mga test):\n- Ward, 4 na kama: ₱1,800\n- Semi-private, 2 kama: ₱3,200\n- Private: ₱4,500\n- Deluxe private: ₱6,200\n- ICU: ₱8,500\nAng saklaw ng PhilHealth at HMO ay depende sa iyong plano. Para sa estimate, tumawag sa Billing: (042) 555-0104.' },
+  { id: 'hmo', title: 'Accepted HMOs', cat: 'Admission & billing', count: 276, upd: 'Oct 28 · J. Reyes',
+    asks: ['Do you accept Maxicare?', 'Anong HMO ang tinatanggap?', 'Covered ba ng Intellicare?'],
+    en: 'We accept these HMOs:\n- ' + HMOS.join('\n- ') + '\nPhilHealth is accepted for admissions. Bring your HMO card and a valid ID. Some plans need a Letter of Authorization (LOA) before your consultation.',
+    fil: 'Tinatanggap namin ang mga HMO na ito:\n- ' + HMOS.join('\n- ') + '\nTinatanggap ang PhilHealth para sa admission. Dalhin ang HMO card at valid ID. May mga plano na kailangan muna ng Letter of Authorization (LOA) bago magpakonsulta.' },
+  { id: 'directions', title: 'Directions and parking', cat: 'Patients & visitors', count: 141, upd: 'Oct 21 · J. Reyes',
+    asks: ['Where is the hospital?', 'Saan po kayo located?', 'May parking ba?'],
+    en: 'We are at Brgy. Isabang, Lucena City, Quezon.\n- Free parking at the open lot beside the Emergency Room\n- Jeepneys and tricycles bound for Isabang stop at the main gate\n- The ER entrance is on the left side of the main building\nSearch “Lucena United Doctors Hospital” in Google Maps for directions.',
+    fil: 'Nasa Brgy. Isabang, Lucena City, Quezon kami.\n- Libre ang parking sa open lot sa tabi ng Emergency Room\n- Humihinto sa main gate ang mga jeep at tricycle na papuntang Isabang\n- Nasa kaliwang bahagi ng main building ang pasukan ng ER\nI-search ang “Lucena United Doctors Hospital” sa Google Maps para sa direksyon.' },
+  { id: 'lab', title: 'Laboratory and result release', cat: 'Services', count: 190, upd: 'Nov 9 · Laboratory',
+    asks: ['When can I get my lab results?', 'Kailan makukuha ang resulta?', 'Open ba ang lab ng Sunday?'],
+    en: 'The laboratory is open 24 hours.\n- Out-patient results are released at the Laboratory counter, ground floor, 7:00 AM to 7:00 PM\n- Bring your official receipt and a valid ID\n- Most routine tests are ready the same day; send-out tests take 3 to 7 days',
+    fil: 'Bukas ang laboratoryo 24 oras.\n- Ang resulta ng out-patient ay kinukuha sa Laboratory counter, ground floor, 7:00 AM hanggang 7:00 PM\n- Dalhin ang official receipt at valid ID\n- Karamihan ng routine test ay handa sa parehong araw; 3 hanggang 7 araw para sa send-out test' },
+  { id: 'billing', title: 'Billing and payment', cat: 'Admission & billing', count: 118, upd: 'Nov 3 · Billing',
+    asks: ['Can I pay with GCash?', 'Saan ang cashier?', 'Paano magbayad?'],
+    en: 'The Billing and Cashier office is on the ground floor, open 24 hours.\n- We accept cash, debit and credit cards, and GCash\n- For a cost estimate before admission, call Billing at (042) 555-0104',
+    fil: 'Nasa ground floor ang Billing at Cashier, bukas 24 oras.\n- Tumatanggap kami ng cash, debit at credit card, at GCash\n- Para sa estimate bago ma-admit, tumawag sa Billing: (042) 555-0104' },
+  { id: 'opd', title: 'Out-patient clinic hours', cat: 'Services', count: 164, upd: 'Oct 21 · J. Reyes',
+    asks: ['What time do clinics open?', 'Anong oras bukas ang OPD?'],
+    en: 'Out-patient clinics are open Monday to Saturday, 8:00 AM to 5:00 PM. Each doctor keeps their own clinic days and hours. Register at the OPD counter, ground floor, 15 minutes before your schedule.',
+    fil: 'Bukas ang mga out-patient clinic Lunes hanggang Sabado, 8:00 AM hanggang 5:00 PM. May sariling araw at oras ng clinic ang bawat doktor. Magparehistro sa OPD counter, ground floor, 15 minuto bago ang iyong schedule.' },
+  { id: 'services', title: 'Services', cat: 'Services', count: 97, upd: 'Oct 21 · J. Reyes',
+    asks: ['What services do you have?', 'May dialysis ba kayo?', 'May CT scan ba?'],
+    en: 'Our main services:\n- 24/7 Emergency Room\n- Laboratory and blood bank\n- X-ray, ultrasound and CT scan\n- Heart station: ECG, 2D echo, stress test\n- Dialysis center\n- Maternity and newborn care\n- Out-patient specialty clinics\nAsk me about any of these to see their hours.',
+    fil: 'Ang aming mga pangunahing serbisyo:\n- Emergency Room, 24/7\n- Laboratoryo at blood bank\n- X-ray, ultrasound at CT scan\n- Heart station: ECG, 2D echo, stress test\n- Dialysis center\n- Maternity at newborn care\n- Mga out-patient specialty clinic\nItanong lang ang alinman dito para makita ang oras.' }
+];
+const kb = id => KB.find(k => k.id === id);
+
+/* =========================================================
+   Copy (English / Filipino / Taglish)
+   ========================================================= */
+const L = {
+  en: {
+    launch: 'Ask the Care Assistant', online: 'Replies instantly · LUDHMC', disclaimer: 'Not for medical advice or diagnosis.', privacy: 'Privacy notice',
+    erStrip: 'Emergency? Call the ER, open 24/7', placeholder: 'Type your question…',
+    greet1: 'Hello! I’m the LUDHMC Care Assistant. I can answer questions about the hospital, show doctors’ clinic schedules, and book a consultation for you.',
+    greet1b: 'Hello! I’m the LUDHMC Care Assistant. I can answer questions about the hospital, like visiting hours, room rates and accepted HMOs.',
+    greet2: 'I can’t give medical advice or a diagnosis. If this is an emergency, call our ER right away.',
+    c_doctor: 'Find a doctor', c_book: 'Book a consultation', c_visiting: 'Visiting hours', c_rooms: 'Room rates', c_hmo: 'Accepted HMOs', c_directions: 'Directions & parking',
+    c_staff: 'Talk to staff', c_records: 'Check my records', c_services: 'Services', c_opd: 'Clinic hours', c_lab: 'Lab results release', c_menu: 'Main menu', c_otherSpec: 'Other specialty',
+    emTitle: 'This may be an emergency', emBody: 'Please go to our Emergency Room now or call the ER. It is open 24 hours, every day.', emCall: 'Call ER', emMap: 'Directions to ER',
+    advice: 'I can’t give medical advice, diagnoses or medicine recommendations. A doctor needs to check you properly. Would you like to book a consultation?',
+    pickSpec: 'Which specialty are you looking for?', bookWho: 'Sure. Which specialty would you like to book?',
+    docsFound: (n, s) => `${n === 1 ? 'One doctor' : n + ' doctors'} in ${s}. Schedules come live from the hospital system.`,
+    consentTitle: 'Before we continue', consentBody: 'To book, I need the patient’s name, mobile number and birthdate. LUDHMC uses these only to schedule your visit and contact you about it, under the Data Privacy Act of 2012 (RA 10173).',
+    consentMore: 'Read the full notice', consentYes: 'I agree', consentNo: 'Not now',
+    consentDeclined: 'No problem. I won’t ask for personal details. You can still ask me anything about the hospital, or call the OPD at ' + OPD + ' to book by phone.',
+    pickDate: d => `Here are the next clinic days for ${d}. Choose a date:`, pickTime: d => `Available times on ${d}:`,
+    details: 'Almost done. Please enter the patient’s details.', review: 'Please check the details before I book this in the hospital system.',
+    booking: 'Booking in the hospital system…', booked: m => `You’re booked. I sent a confirmation by SMS to ${m}.`,
+    anything: 'Anything else I can help with?', hello: 'Hello! What can I help you with today?', thanks: 'You’re welcome. Take care!',
+    fallback: 'Sorry, I didn’t quite get that. Here’s what I can help with:',
+    handover: 'I’ll connect you with our Patient Relations team. Staff are online Monday to Saturday, 8:00 AM to 8:00 PM.',
+    waiting: 'Waiting for a staff member · usually about 3 minutes', joined: n => `${n} from Patient Relations joined the chat`, left: 'The staff member left the chat. The Care Assistant is back.',
+    queued: 'Your message was sent to the staff queue.',
+    bookBasic: 'To book a consultation, call our Out-Patient Department at ' + OPD + ', Monday to Saturday, 8:00 AM to 5:00 PM.',
+    doctorBasic: 'Our doctor directory and clinic schedules are on the Find a Doctor page. For the latest schedule, call the OPD at ' + OPD + '.',
+    staffBasic: 'You can reach Patient Relations at ' + PR + ', Monday to Saturday, 8:00 AM to 8:00 PM.',
+    recIntro: 'To protect your records, I’ll verify you first with a one-time code sent to the mobile number in your hospital file.',
+    otpSent: m => `I sent a 6-digit code to ${m}. Enter it below. It expires in 5 minutes.`, otpBad: 'That code doesn’t match. Check the SMS and try again.',
+    recReady: 'You’re verified. Here’s what I found in your hospital file:',
+    langSet: 'Okay, I’ll reply in English.', listening: 'Listening… speak now', voiceSample: 'What time can we visit a patient in the ICU?',
+    pkgReset: 'Chat restarted for the new package.'
+  },
+  fil: {
+    launch: 'Magtanong sa Care Assistant', online: 'Agad sumasagot · LUDHMC', disclaimer: 'Hindi para sa medikal na payo o diagnosis.', privacy: 'Abiso sa privacy',
+    erStrip: 'Emergency? Tumawag sa ER, bukas 24/7', placeholder: 'I-type ang iyong tanong…',
+    greet1: 'Magandang araw! Ako ang Care Assistant ng LUDHMC. Masasagot ko ang mga tanong tungkol sa ospital, maipapakita ang schedule ng mga doktor, at maibu-book ka ng konsulta.',
+    greet1b: 'Magandang araw! Ako ang Care Assistant ng LUDHMC. Masasagot ko ang mga tanong tungkol sa ospital, gaya ng oras ng pagdalaw, presyo ng kuwarto at mga tinatanggap na HMO.',
+    greet2: 'Hindi ako makapagbibigay ng medikal na payo o diagnosis. Kung emergency, tumawag agad sa aming ER.',
+    c_doctor: 'Maghanap ng doktor', c_book: 'Mag-book ng konsulta', c_visiting: 'Oras ng pagdalaw', c_rooms: 'Presyo ng kuwarto', c_hmo: 'Mga tinatanggap na HMO', c_directions: 'Direksyon at parking',
+    c_staff: 'Kausapin ang staff', c_records: 'Tingnan ang aking records', c_services: 'Mga serbisyo', c_opd: 'Oras ng clinic', c_lab: 'Pagkuha ng resulta', c_menu: 'Pangunahing menu', c_otherSpec: 'Ibang espesyalidad',
+    emTitle: 'Maaaring emergency ito', emBody: 'Pumunta agad sa aming Emergency Room o tumawag sa ER. Bukas ito 24 oras, araw-araw.', emCall: 'Tumawag sa ER', emMap: 'Direksyon sa ER',
+    advice: 'Hindi ako makapagbibigay ng medikal na payo, diagnosis o rekomendasyon ng gamot. Kailangan kang matingnan ng doktor. Gusto mo bang mag-book ng konsulta?',
+    pickSpec: 'Anong espesyalidad ang hinahanap mo?', bookWho: 'Sige. Anong espesyalidad ang gusto mong i-book?',
+    docsFound: (n, s) => `${n === 1 ? 'Isang doktor' : n + ' doktor'} sa ${s}. Galing mismo sa sistema ng ospital ang mga schedule.`,
+    consentTitle: 'Bago tayo magpatuloy', consentBody: 'Para makapag-book, kailangan ko ang pangalan, mobile number at kaarawan ng pasyente. Gagamitin lang ito ng LUDHMC para sa iyong appointment, alinsunod sa Data Privacy Act of 2012 (RA 10173).',
+    consentMore: 'Basahin ang buong abiso', consentYes: 'Sumasang-ayon ako', consentNo: 'Hindi muna',
+    consentDeclined: 'Walang problema. Hindi ako hihingi ng personal na detalye. Puwede ka pa ring magtanong tungkol sa ospital, o tumawag sa OPD sa ' + OPD + ' para mag-book.',
+    pickDate: d => `Ito ang mga susunod na araw ng clinic ni ${d}. Pumili ng petsa:`, pickTime: d => `Mga bakanteng oras sa ${d}:`,
+    details: 'Malapit na. Pakilagay ang detalye ng pasyente.', review: 'Pakisuri muna ang mga detalye bago ko i-book sa sistema ng ospital.',
+    booking: 'Nagbu-book sa sistema ng ospital…', booked: m => `Naka-book ka na. Nagpadala ako ng kumpirmasyon sa SMS sa ${m}.`,
+    anything: 'May iba pa ba akong maitutulong?', hello: 'Magandang araw! Ano ang maitutulong ko?', thanks: 'Walang anuman. Ingat po!',
+    fallback: 'Pasensya, hindi ko masyadong naintindihan. Ito ang mga matutulungan ko:',
+    handover: 'Ikokonekta kita sa aming Patient Relations team. Online ang staff Lunes hanggang Sabado, 8:00 AM hanggang 8:00 PM.',
+    waiting: 'Naghihintay ng staff · karaniwang mga 3 minuto', joined: n => `Sumali si ${n} mula sa Patient Relations`, left: 'Umalis na ang staff. Bumalik ang Care Assistant.',
+    queued: 'Naipadala ang iyong mensahe sa staff.',
+    bookBasic: 'Para mag-book ng konsulta, tumawag sa Out-Patient Department sa ' + OPD + ', Lunes hanggang Sabado, 8:00 AM hanggang 5:00 PM.',
+    doctorBasic: 'Nasa Find a Doctor page ang listahan ng mga doktor at schedule. Para sa pinakabagong schedule, tumawag sa OPD sa ' + OPD + '.',
+    staffBasic: 'Matatawagan ang Patient Relations sa ' + PR + ', Lunes hanggang Sabado, 8:00 AM hanggang 8:00 PM.',
+    recIntro: 'Para maprotektahan ang iyong records, beberipikahin muna kita gamit ang one-time code na ipapadala sa mobile number na nasa iyong file sa ospital.',
+    otpSent: m => `Nagpadala ako ng 6-digit code sa ${m}. Ilagay ito sa ibaba. Mag-e-expire ito sa loob ng 5 minuto.`, otpBad: 'Hindi tugma ang code. Tingnan ang SMS at subukan ulit.',
+    recReady: 'Beripikado ka na. Ito ang nakita ko sa iyong file:',
+    langSet: 'Sige, sasagot ako sa Filipino.', listening: 'Nakikinig… magsalita na', voiceSample: 'Anong oras po pwedeng dumalaw sa ICU?',
+    pkgReset: 'Nag-restart ang chat para sa bagong package.'
+  },
+  tl: {
+    launch: 'Ask the Care Assistant', online: 'Replies agad · LUDHMC', disclaimer: 'Hindi ito para sa medical advice o diagnosis.', privacy: 'Privacy notice',
+    erStrip: 'Emergency? Tawag agad sa ER, open 24/7', placeholder: 'Type mo ang tanong mo…',
+    greet1: 'Hi po! Ako ang Care Assistant ng LUDHMC. Pwede kitang tulungan sa questions about the hospital, makita ang schedule ng mga doctor, at mag-book ng consult.',
+    greet1b: 'Hi po! Ako ang Care Assistant ng LUDHMC. Pwede kitang tulungan sa questions about the hospital, like visiting hours, room rates at accepted HMOs.',
+    greet2: 'Hindi ako nagbibigay ng medical advice or diagnosis. Kung emergency, tawag agad sa ER namin.',
+    c_doctor: 'Find a doctor', c_book: 'Mag-book ng consult', c_visiting: 'Visiting hours', c_rooms: 'Room rates', c_hmo: 'Accepted HMOs', c_directions: 'Directions at parking',
+    c_staff: 'Talk to staff', c_records: 'I-check ang records ko', c_services: 'Services', c_opd: 'Clinic hours', c_lab: 'Lab results', c_menu: 'Main menu', c_otherSpec: 'Ibang specialty',
+    emTitle: 'Baka emergency ito', emBody: 'Pumunta na agad sa Emergency Room namin or tumawag sa ER. Open ito 24/7.', emCall: 'Call ER', emMap: 'Directions sa ER',
+    advice: 'Sorry po, hindi ako pwedeng magbigay ng medical advice, diagnosis o gamot. Mas okay na ma-check ka ng doctor. Gusto mo bang mag-book ng consult?',
+    pickSpec: 'Anong specialty ang hanap mo?', bookWho: 'Sure! Anong specialty ang gusto mong i-book?',
+    docsFound: (n, s) => `${n === 1 ? 'One doctor' : n + ' doctors'} sa ${s}. Live ang schedules from the hospital system.`,
+    consentTitle: 'Bago tayo mag-continue', consentBody: 'Para maka-book, kailangan ko ang name, mobile number at birthdate ng patient. Gagamitin lang ito ng LUDHMC para sa appointment mo, under the Data Privacy Act of 2012 (RA 10173).',
+    consentMore: 'Basahin ang full notice', consentYes: 'I agree', consentNo: 'Hindi muna',
+    consentDeclined: 'Okay lang po. Hindi ako hihingi ng personal details. Pwede ka pa ring magtanong about the hospital, or call the OPD at ' + OPD + ' para mag-book.',
+    pickDate: d => `Ito ang next clinic days ni ${d}. Pili ka ng date:`, pickTime: d => `Available times sa ${d}:`,
+    details: 'Konti na lang! Pakilagay ang details ng patient.', review: 'Pa-check muna ng details bago ko i-book sa hospital system.',
+    booking: 'Bino-book na sa hospital system…', booked: m => `Booked ka na! Nag-send ako ng confirmation via SMS sa ${m}.`,
+    anything: 'May iba ka pa bang tanong?', hello: 'Hi po! Ano ang maitutulong ko today?', thanks: 'Walang anuman po. Ingat!',
+    fallback: 'Sorry, di ko masyado na-gets. Ito yung mga kaya kong i-help:',
+    handover: 'I-connect kita sa Patient Relations team namin. Online ang staff Monday to Saturday, 8:00 AM to 8:00 PM.',
+    waiting: 'Waiting for staff · usually mga 3 minutes', joined: n => `Nag-join si ${n} from Patient Relations`, left: 'Nag-leave na ang staff. Balik na ang Care Assistant.',
+    queued: 'Na-send na ang message mo sa staff.',
+    bookBasic: 'Para mag-book ng consult, tawag lang sa Out-Patient Department at ' + OPD + ', Monday to Saturday, 8:00 AM to 5:00 PM.',
+    doctorBasic: 'Nasa Find a Doctor page ang list ng doctors at schedules. Para sa latest schedule, call the OPD at ' + OPD + '.',
+    staffBasic: 'Pwede mong tawagan ang Patient Relations at ' + PR + ', Monday to Saturday, 8:00 AM to 8:00 PM.',
+    recIntro: 'Para safe ang records mo, ive-verify muna kita with a one-time code na ise-send sa mobile number sa hospital file mo.',
+    otpSent: m => `Nag-send ako ng 6-digit code sa ${m}. Ilagay mo sa baba. Mag-e-expire ito in 5 minutes.`, otpBad: 'Hindi match ang code. I-check ang SMS at try ulit.',
+    recReady: 'Verified ka na! Ito ang nakita ko sa hospital file mo:',
+    langSet: 'Okay po, Taglish na tayo.', listening: 'Nakikinig… speak na po', voiceSample: 'Anong oras po pwede mag-visit sa ICU?',
+    pkgReset: 'Na-restart ang chat para sa bagong package.'
+  }
+};
+
+/* =========================================================
+   State
+   ========================================================= */
+const FEAT = {
+  basic: ['faq'],
+  standard: ['faq', 'doctor', 'book', 'handover', 'messenger'],
+  premium: ['faq', 'doctor', 'book', 'handover', 'messenger', 'records', 'voice', 'reports', 'reminders']
+};
+const newLive = () => ({ id: 'live', name: 'Website visitor', live: true, channel: 'web', lang: 'English', status: 'assistant', started: nowT(), tags: [], msgs: [] });
+const S = {
+  view: 'patient', pkg: 'standard', lang: 'en', consent: false, flow: null, q: Promise.resolve(),
+  live: newLive(), tab: 'conversations', filter: 'all', sel: null, kbSel: 'visiting', kbTab: 'en', kbQuery: '',
+  appts: [], convos: [], epoch: 0
+};
+const has = f => FEAT[S.pkg].includes(f);
+const t = (k, ...a) => { const v = L[S.lang][k] ?? L.en[k]; return typeof v === 'function' ? v(...a) : v; };
+const langName = () => ({ en: 'English', fil: 'Filipino', tl: 'Taglish' }[S.lang]);
+
+/* =========================================================
+   Chat widget
+   ========================================================= */
+const body = $('#cw-body'), chipsEl = $('#cw-chips'), input = $('#cw-text');
+
+function rich(text) {
+  const lines = String(text).split('\n'); let out = '', list = [];
+  const flush = () => { if (list.length) { out += '<ul>' + list.map(l => `<li>${esc(l)}</li>`).join('') + '</ul>'; list = []; } };
+  for (const ln of lines) { if (/^\s*-\s+/.test(ln)) list.push(ln.replace(/^\s*-\s+/, '')); else { flush(); if (ln.trim()) out += `<p>${esc(ln)}</p>`; } }
+  flush(); return out;
+}
+function scrollEnd() { requestAnimationFrame(() => { body.scrollTop = body.scrollHeight; }); }
+function addNode(n) { body.insertBefore(n, chipsEl); scrollEnd(); return n; }
+function log(role, text) { S.live.msgs.push({ role, text, t: nowT() }); if (role === 'patient') S.live.lang = langName(); }
+function addUser(text) { addNode(el(`<div class="msg user"><div class="bubble">${esc(text)}</div></div>`)); log('patient', text); }
+function addSys(html, cls = '') { return addNode(el(`<div class="sys ${cls}">${html}</div>`)); }
+function addStaffMsg(text) { addNode(el(`<div class="msg staff"><span class="who">Joanna · Patient Relations</span><div class="bubble">${esc(text)}</div></div>`)); }
+function setChips(list) {
+  chipsEl.innerHTML = list.map(c => `<button type="button" class="chip ${c.red ? 'red' : ''}" data-act="${c.act}" data-arg="${esc(c.arg ?? '')}">${esc(c.label)}</button>`).join('');
+  scrollEnd();
+}
+const clearChips = () => { chipsEl.innerHTML = ''; };
+let typingEl = null;
+function typing(on) {
+  if (on && !typingEl) typingEl = addNode(el('<div class="typing" aria-label="Assistant is typing"><i></i><i></i><i></i></div>'));
+  if (!on && typingEl) { typingEl.remove(); typingEl = null; }
+}
+/* Queue assistant output so messages appear in order with a short typing pause */
+function say(...items) {
+  const epoch = S.epoch;
+  S.q = S.q.then(async () => {
+    for (const it of items) {
+      if (epoch !== S.epoch) return;
+      if (typeof it === 'function') { it(); continue; }
+      if (!it.text && !it.html && it.chips) { setChips(it.chips); continue; }
+      const d = it.delay ?? 650;
+      if (d > 0) { typing(true); await wait(d); typing(false); }
+      if (epoch !== S.epoch) return;
+      if (it.text) addNode(el(`<div class="msg bot"><div class="bubble">${rich(it.text)}</div></div>`));
+      if (it.html) addNode(el(`<div class="msg bot wide">${it.html}</div>`));
+      log('assistant', it.log ?? it.text ?? '');
+      if (it.chips) setChips(it.chips);
+    }
+  });
+  return S.q;
+}
+function mainChips() {
+  const keys = has('book') ? ['doctor', 'book', 'visiting', 'rooms', 'hmo', 'directions', 'staff'] : ['visiting', 'rooms', 'hmo', 'directions', 'opd', 'services'];
+  if (has('records')) keys.splice(2, 0, 'records');
+  return keys.map(k => ({ label: t('c_' + k), act: 'intent', arg: k, red: k === 'book' }));
+}
+const specChips = () => SPECS.map(s => ({ label: s, act: 'spec', arg: s }));
+const anything = () => ({ text: t('anything'), chips: mainChips(), delay: 450 });
+
+/* --- intent detection --- */
+const RE = {
+  emergency: /(chest pain|sakit (ng|sa) dibdib|sumasakit (ang |po )?(ng )?dibdib|masakit (ang )?dibdib|can'?t breathe|cannot breathe|difficulty breathing|hirap (huminga|makahinga)|hindi makahinga|di makahinga|stroke|unconscious|walang malay|nahimatay|fainted|seizure|kombulsyon|nag-?seizure|heavy bleeding|maraming dugo|dinudugo|poison|nalason|overdose|suicid|magpakamatay|heart attack|atake sa puso|inatake)/,
+  advice: /(medicine|\bgamot|dosage|\bdose\b|diagnos|what should i take|ano(ng)? (dapat )?(iinumin|inumin)|is it normal|normal (lang )?ba|antibiotic|paracetamol|lunas|gamutin|what do i have|ano(ng)? sakit ko)/,
+  thanks: /\b(thank|thanks|salamat|ty)\b/,
+  records: /(my (lab )?results?|lab results?|resulta ko|results? ko|my bill|bill ko|balance|appointment status|status ng appointment|is my .* ready|ready na ba)/,
+  staff: /(talk to|speak (to|with)|kausap|makausap|human|real person|\bagent\b|representative|customer service|\bstaff\b|\btao\b)/,
+  book: /(book|appointment|appt|pa-?schedule|magpa-?schedule|magpa-?check|consult|konsulta|magpakonsulta)/,
+  doctor: /(doctor|doktor|\bdr\b|specialist|espesyalista|find a)/,
+  visiting: /(visit|bisita|dalaw|visitor)/,
+  rooms: /(room|kwarto|kuwarto|\bward\b|private|semi-?private|\bicu rate)/,
+  hmo: /(\bhmo|maxicare|intellicare|medicard|philcare|philhealth|cocolife|avega|pacific cross|valucare|insurance|coverage|covered|\bloa\b)/,
+  directions: /(where|address|saan|direction|location|located|parking|paano pumunta|how (do i )?get|jeep|map)/,
+  lab: /(\blab\b|laborator|result|resulta)/,
+  billing: /(bill|billing|bayad|payment|pay\b|gcash|cashier|magbayad)/,
+  opd: /(clinic hours|\bopd\b|out-?patient|anong oras bukas|what time .*open)/,
+  services: /(service|serbisyo|x-?ray|ultrasound|ct ?scan|dialysis|2d echo|ecg|mri)/,
+  hello: /^\s*(hi|hello|hey|good (morning|afternoon|evening)|magandang (umaga|hapon|gabi|araw)|kumusta)\b/
+};
+const SPEC_RE = [
+  ['Cardiology', /(cardio|heart|puso)/], ['Pediatrics', /(pedia|child|bata|anak|baby)/], ['OB-GYN', /(\bob\b|ob-?gyn|gyne|pregnan|buntis|prenatal)/],
+  ['Internal Medicine', /(internal|internist|diabet|endocrin)/], ['Orthopedics', /(ortho|bone|buto|joint|tuhod)/], ['ENT', /(\bent\b|\bear\b|nose|throat|tenga|tainga|ilong|lalamunan)/],
+  ['Ophthalmology', /(\beye|mata|ophthal|optha)/], ['Dermatology', /(derma|skin|balat)/]
+];
+const detectSpec = s => (SPEC_RE.find(([, re]) => re.test(s)) || [])[0];
+
+function route(raw) {
+  const s = ' ' + raw.toLowerCase() + ' ';
+  if (RE.emergency.test(s)) return doIntent('emergency');
+  if (S.live.status === 'waiting' || S.live.status === 'staff') {
+    if (S.live.status === 'waiting') addSys(esc(t('queued')));
+    return;
+  }
+  if (RE.advice.test(s)) return doIntent('advice');
+  if (RE.thanks.test(s)) return doIntent('thanks');
+  if (RE.staff.test(s)) return doIntent('staff');
+  if (RE.records.test(s)) return doIntent(has('records') ? 'records' : 'lab');
+  const spec = detectSpec(s);
+  if (RE.book.test(s)) return doIntent('book', spec);
+  if (RE.doctor.test(s) || spec) return doIntent('doctor', spec);
+  for (const k of ['visiting', 'rooms', 'hmo', 'billing', 'directions', 'lab', 'opd', 'services']) if (RE[k].test(s)) return doIntent(k);
+  if (RE.hello.test(s)) return doIntent('hello');
+  return doIntent('fallback');
+}
+
+function doIntent(k, arg) {
+  clearChips();
+  switch (k) {
+    case 'emergency':
+      if (!S.live.tags.includes('Emergency')) S.live.tags.push('Emergency');
+      log('event', 'Emergency words detected · ER hotline shown');
+      return say({ html: emergencyCard(), log: `Showed emergency card with ER hotline ${ER}`, delay: 200 }, anything());
+    case 'advice':
+      if (!S.live.tags.includes('Medical advice declined')) S.live.tags.push('Medical advice declined');
+      return say({ text: t('advice'), chips: has('book') ? [{ label: t('c_book'), act: 'intent', arg: 'book', red: true }, { label: t('c_doctor'), act: 'intent', arg: 'doctor' }, { label: t('c_menu'), act: 'intent', arg: 'menu' }] : mainChips() });
+    case 'doctor':
+      if (!has('doctor')) return say({ text: t('doctorBasic') }, anything());
+      if (arg) return showDoctors(arg);
+      return say({ text: t('pickSpec'), chips: specChips() });
+    case 'book':
+      if (!has('book')) return say({ text: t('bookBasic') }, anything());
+      if (arg) return showDoctors(arg);
+      return say({ text: t('bookWho'), chips: specChips() });
+    case 'staff':
+      if (!has('handover')) return say({ text: t('staffBasic') }, anything());
+      return startHandover();
+    case 'records': return startRecords();
+    case 'menu': return say({ text: t('anything'), chips: mainChips(), delay: 300 });
+    case 'hello': return say({ text: t('hello'), chips: mainChips() });
+    case 'thanks': return say({ text: t('thanks'), chips: mainChips() });
+    case 'fallback': return say({ text: t('fallback'), chips: mainChips() });
+    default: {
+      const e = kb(k); if (!e) return say({ text: t('fallback'), chips: mainChips() });
+      e.count++;
+      return say({ text: S.lang === 'en' ? e.en : e.fil }, anything());
+    }
+  }
+}
+
+/* --- cards --- */
+function emergencyCard() {
+  return `<div class="er-card" role="alert">
+    <h4>${icon('alert', 18, 2.2)} ${esc(t('emTitle'))}</h4>
+    <p>${esc(t('emBody'))}</p>
+    <span class="er-num">${ER}</span>
+    <div class="acts">
+      <a class="btn btn-red btn-sm" href="${ER_TEL}">${icon('phone', 15)} ${esc(t('emCall'))}</a>
+      <a class="btn btn-plain btn-sm" href="https://www.google.com/maps/search/?api=1&query=Lucena+United+Doctors+Hospital" target="_blank" rel="noopener">${icon('pin', 15)} ${esc(t('emMap'))}</a>
+    </div>
+  </div>`;
+}
+function showDoctors(spec) {
+  const docs = DOCS.filter(d => d.spec === spec);
+  const html = `<div class="card">
+    <div class="card-h"><span>${esc(spec)}</span><span class="live"><i></i>Live from HMS</span></div>
+    ${docs.map(d => `<div class="doc">
+      <div class="doc-av">${initials(d.name)}</div>
+      <div><div class="doc-name">${esc(d.name)}</div><div class="doc-sub">${esc(d.sub)}</div>
+        <dl class="doc-meta"><dt>Clinic</dt><dd>${daysLbl(d.days)} · ${fmtT(d.s)} – ${fmtT(d.e)}</dd><dt>Next</dt><dd>${fmtD(nextDates(d, 1)[0])}</dd><dt>Room</dt><dd>${esc(d.room)}</dd></dl>
+      </div>
+      ${has('book') ? `<button type="button" class="btn btn-red btn-sm" data-act="book-doc" data-arg="${d.id}">Book</button>` : ''}
+    </div>`).join('')}
+  </div>`;
+  return say({ text: t('docsFound', docs.length, spec) },
+    { html, log: `Showed doctor list: ${spec} (${docs.length})`, delay: 350, chips: [{ label: t('c_otherSpec'), act: 'intent', arg: 'doctor' }, { label: t('c_menu'), act: 'intent', arg: 'menu' }] });
+}
+function consentCard() {
+  return `<div class="card" data-card="consent">
+    <div class="card-h"><span style="display:flex;gap:7px;align-items:center;color:var(--green)">${icon('shield', 16)} ${esc(t('consentTitle'))}</span></div>
+    <div class="cbody"><p>${esc(t('consentBody'))}</p>
+      <details><summary>${esc(t('consentMore'))}</summary>
+        <ul><li>Personal controller: Lucena United Doctors Hospital and Medical Center</li><li>Data collected: name, mobile number, birthdate, HMO (optional)</li><li>Purpose: scheduling your consultation and sending confirmations</li><li>Kept according to the hospital’s retention policy; encrypted in transit and at rest</li><li>You may ask to access, correct or delete your data through Patient Relations, ${PR}</li></ul>
+      </details>
+    </div>
+    <div class="cacts"><button type="button" class="btn btn-green btn-sm" data-act="consent-yes">${esc(t('consentYes'))}</button><button type="button" class="btn btn-plain btn-sm" data-act="consent-no">${esc(t('consentNo'))}</button></div>
+  </div>`;
+}
+function timeCard(doc, date) {
+  return `<div class="card" data-card="time">
+    <div class="card-h"><span>${fmtD(date)} · ${esc(doc.name)}</span><span class="live"><i></i>Live</span></div>
+    <div class="slots">${slots(doc, date).map(s => `<button type="button" class="slot" data-act="time" data-arg="${s.m}" ${s.taken ? 'disabled aria-label="' + s.label + ', taken"' : ''}>${s.label}</button>`).join('')}</div>
+    <div class="slot-key"><span>Crossed out: already taken</span></div>
+  </div>`;
+}
+function detailsCard() {
+  const u = uid();
+  return `<form class="card form" data-form="details" novalidate>
+    <div class="card-h"><span>Patient details</span><span class="live" style="color:var(--muted)">${icon('lock', 13)} Private</span></div>
+    <div class="fbody">
+      <div class="fld"><label for="n${u}">Patient’s full name</label><input id="n${u}" name="fullname" autocomplete="name" placeholder="Juan Dela Cruz"></div>
+      <div class="frow">
+        <div class="fld"><label for="m${u}">Mobile number</label><input id="m${u}" name="mobile" inputmode="tel" autocomplete="tel" placeholder="0917 123 4567"></div>
+        <div class="fld"><label for="b${u}">Birthdate</label><input id="b${u}" name="bday" type="date"></div>
+      </div>
+      <fieldset class="fld"><legend>Patient type</legend><div class="radios">
+        <label><input type="radio" name="ptype" id="r1${u}" value="First visit" checked> First visit</label>
+        <label><input type="radio" name="ptype" id="r2${u}" value="Returning patient"> Returning</label>
+      </div></fieldset>
+      <div class="fld"><label for="h${u}">HMO</label><select id="h${u}" name="hmo"><option>None, self-pay</option>${HMOS.map(h => `<option>${h}</option>`).join('')}</select></div>
+      <p class="ferr" hidden></p>
+      <div class="factions"><button type="submit" class="btn btn-green btn-sm">Continue</button><button type="button" class="demo-lnk" data-act="sample">Fill sample patient</button></div>
+    </div>
+  </form>`;
+}
+function reviewCard(f) {
+  return `<div class="card" data-card="review">
+    <div class="card-h"><span>Review appointment</span></div>
+    <dl class="kv">
+      <div><dt>Doctor</dt><dd>${esc(f.doc.name)}<br><span style="font-weight:400;color:var(--muted)">${esc(f.doc.spec)}</span></dd></div>
+      <div><dt>When</dt><dd>${fmtD(f.date)} · ${fmtT(f.time)}</dd></div>
+      <div><dt>Where</dt><dd>${esc(f.doc.room)}</dd></div>
+      <div><dt>Patient</dt><dd>${esc(f.p.name)} · ${esc(f.p.ptype)}</dd></div>
+      <div><dt>Mobile</dt><dd>${esc(f.p.mobile)}</dd></div>
+      <div><dt>HMO</dt><dd>${esc(f.p.hmo)}</dd></div>
+    </dl>
+    <div class="cacts"><button type="button" class="btn btn-red btn-sm" data-act="confirm">Confirm booking</button><button type="button" class="btn btn-plain btn-sm" data-act="restart-book">Change</button></div>
+  </div>`;
+}
+function confirmCard(a) {
+  const remind = new Date(a.date); remind.setDate(remind.getDate() - 1);
+  return `<div class="card">
+    <div class="ok-h">${icon('check', 20, 3)} Appointment confirmed</div>
+    <div class="refno"><span>Reference no.</span><strong>${a.ref}</strong></div>
+    <dl class="kv">
+      <div><dt>Doctor</dt><dd>${esc(a.doctor)}</dd></div>
+      <div><dt>When</dt><dd>${fmtD(a.date)} · ${a.time}</dd></div>
+      <div><dt>Where</dt><dd>${esc(a.room)}</dd></div>
+    </dl>
+    <p class="cnote">Arrive 15 minutes early at the OPD registration counter, ground floor. Bring a valid ID${a.hmo !== 'None, self-pay' ? ' and your ' + esc(a.hmo) + ' card' : ''}.</p>
+    ${has('reminders') ? `<p class="cnote gold">SMS and email reminder scheduled for ${fmtD(remind)}, 9:00 AM.</p>` : ''}
+    <div class="hms">${icon('db', 14)} Saved in the Hospital Management System</div>
+  </div>`;
+}
+function otpReqCard() {
+  const u = uid();
+  return `<form class="card form" data-form="otp-req" novalidate>
+    <div class="card-h"><span>Verify it’s you</span><span class="live" style="color:var(--muted)">${icon('lock', 13)} One-time code</span></div>
+    <div class="fbody">
+      <div class="frow">
+        <div class="fld"><label for="om${u}">Mobile number</label><input id="om${u}" name="mobile" inputmode="tel" placeholder="0917 123 4567"></div>
+        <div class="fld"><label for="ob${u}">Birthdate</label><input id="ob${u}" name="bday" type="date"></div>
+      </div>
+      <p class="ferr" hidden></p>
+      <div class="factions"><button type="submit" class="btn btn-green btn-sm">Send code</button><button type="button" class="demo-lnk" data-act="sample-otp">Fill sample patient</button></div>
+    </div>
+  </form>`;
+}
+function otpCodeCard() {
+  const u = uid();
+  return `<form class="card form" data-form="otp-code" novalidate>
+    <div class="fbody">
+      <div class="fld"><label for="oc${u}">6-digit code</label><input id="oc${u}" name="code" class="otp-in" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••"></div>
+      <p class="ferr" hidden></p>
+      <div class="factions"><button type="submit" class="btn btn-green btn-sm">Verify</button><span class="demo-note">Prototype code: 482913</span></div>
+    </div>
+  </form>`;
+}
+function recordsCard() {
+  const d = DOCS[0], nd = nextDates(d, 1, 2)[0];
+  const exp = new Date(); exp.setDate(exp.getDate() + 2);
+  return `<div class="card">
+    <div class="card-h"><span>Maria Santos · Patient no. 2019-04418</span><span class="live"><i></i>Live from HMS</span></div>
+    <div class="rec-sec"><h5>Upcoming appointment</h5>
+      <div class="rec-row"><span>${esc(d.name)}, ${d.spec}<br><span style="color:var(--muted)">${fmtD(nd)} · 9:30 AM · Ref LUD-${yymmdd(nd)}-0388</span></span><span class="pill p-green">Confirmed</span></div></div>
+    <div class="rec-sec"><h5>Laboratory results</h5>
+      <div class="rec-row"><span>Complete blood count (CBC)</span><span class="pill p-green">Ready for release</span></div>
+      <div class="rec-row"><span>Lipid profile</span><span class="pill p-gold">Processing · ${fmtD(exp)}</span></div>
+      <div class="rec-row"><span>HbA1c</span><span class="pill p-green">Ready for release</span></div></div>
+    <div class="rec-sec"><h5>Bills</h5>
+      <div class="rec-row"><span>Out-patient account, Nov 14</span><span class="num" style="font-weight:700">₱0.00 · Paid</span></div></div>
+    <p class="cnote" style="margin-top:10px">Results are released at the Laboratory counter, ground floor, 7:00 AM to 7:00 PM. The assistant shows availability only, not the results themselves.</p>
+  </div>`;
+}
+const doneCard = c => { if (!c) return; c.classList.add('done'); $$('button,input,select', c).forEach(x => { x.disabled = true; }); };
+
+/* --- flows --- */
+function bookDoc(id) {
+  const doc = DOCS.find(d => d.id === +id); if (!doc) return;
+  S.flow = { doc };
+  addUser(`Book ${doc.name}`);
+  if (!S.consent) return say({ html: consentCard(), log: 'Showed privacy notice (RA 10173)', delay: 450 });
+  askDate();
+}
+function askDate() {
+  const f = S.flow;
+  say({ text: t('pickDate', f.doc.name), chips: nextDates(f.doc, 4).map(d => ({ label: fmtD(d), act: 'date', arg: d.toISOString() })) });
+}
+function startHandover() {
+  S.live.status = 'waiting'; S.live.waitSince = Date.now();
+  if (!S.live.tags.includes('Handover')) S.live.tags.push('Handover');
+  return say({ text: t('handover') }, () => {
+    log('event', 'Handed over to staff · waiting');
+    addSys(`${icon('chat', 14)} ${esc(t('waiting'))}`, 'wait');
+    addSys(`<button type="button" class="demo-lnk lnk" data-act="goto-staff">Answer this chat as staff</button>`);
+    setStatusLine();
+    renderNav();
+  });
+}
+function startRecords() {
+  return say({ text: t('recIntro') }, { html: otpReqCard(), log: 'Asked for one-time code verification', delay: 350 });
+}
+function setStatusLine() {
+  const st = $('#cw-status');
+  if (S.live.status === 'staff') st.innerHTML = '<i style="background:#9CC3F0"></i><span>Chatting with Joanna · Patient Relations</span>';
+  else if (S.live.status === 'waiting') st.innerHTML = '<i style="background:var(--gold)"></i><span>' + esc(t('waiting')) + '</span>';
+  else st.innerHTML = '<i></i><span>' + esc(t('online')) + '</span>';
+}
+
+/* --- chat events --- */
+body.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const act = b.dataset.act, arg = b.dataset.arg, card = b.closest('.card');
+  if (act === 'intent') { addUser(b.textContent); return doIntent(arg); }
+  if (act === 'spec') { addUser(b.textContent); clearChips(); return showDoctors(arg); }
+  if (act === 'book-doc') { clearChips(); return bookDoc(arg); }
+  if (act === 'consent-yes') {
+    doneCard(card); addUser(t('consentYes')); S.consent = true; log('event', 'Privacy consent given (RA 10173)'); return askDate();
+  }
+  if (act === 'consent-no') { doneCard(card); addUser(t('consentNo')); S.flow = null; return say({ text: t('consentDeclined') }, anything()); }
+  if (act === 'date') {
+    clearChips(); S.flow.date = new Date(arg); addUser(b.textContent);
+    return say({ text: t('pickTime', fmtD(S.flow.date)) }, { html: timeCard(S.flow.doc, S.flow.date), log: 'Showed available times', delay: 300 });
+  }
+  if (act === 'time') {
+    b.classList.add('sel'); doneCard(card); S.flow.time = +arg; addUser(fmtT(+arg));
+    return say({ text: t('details') }, { html: detailsCard(), log: 'Asked for patient details', delay: 300 });
+  }
+  if (act === 'sample') {
+    const f = b.closest('form'); f.fullname.value = 'Maria Santos'; f.mobile.value = '0917 555 4821'; f.bday.value = '1986-03-14'; f.hmo.value = 'Maxicare'; f.querySelector('[value="Returning patient"]').checked = true; return;
+  }
+  if (act === 'sample-otp') { const f = b.closest('form'); f.mobile.value = '0917 555 4821'; f.bday.value = '1986-03-14'; return; }
+  if (act === 'restart-book') { doneCard(card); addUser('Change'); const doc = S.flow.doc; S.flow = { doc }; return askDate(); }
+  if (act === 'confirm') { doneCard(card); return confirmBooking(); }
+  if (act === 'goto-staff') { S.sel = 'live'; S.tab = 'conversations'; S.filter = 'all'; return setView('staff'); }
+});
+body.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target, kind = f.dataset.form, err = $('.ferr', f);
+  const fail = (msg, field) => { err.textContent = msg; err.hidden = false; $$('input', f).forEach(i => i.removeAttribute('aria-invalid')); if (field) { field.setAttribute('aria-invalid', 'true'); field.focus(); } };
+  const mobOk = v => /^(09|\+?639)\d{9}$/.test(v.replace(/[\s-]/g, ''));
+  if (kind === 'details') {
+    const name = f.fullname.value.trim(), mobile = f.mobile.value.trim(), bday = f.bday.value;
+    if (name.length < 3) return fail('Enter the patient’s full name.', f.fullname);
+    if (!mobOk(mobile)) return fail('Enter an 11-digit mobile number that starts with 09.', f.mobile);
+    if (!bday || new Date(bday) > new Date()) return fail('Enter the patient’s birthdate.', f.bday);
+    err.hidden = true; doneCard(f);
+    S.flow.p = { name, mobile, bday, ptype: f.ptype.value, hmo: f.hmo.value };
+    log('patient', `[Submitted patient details: ${name}, ${maskMobile(mobile)}]`);
+    return say({ text: t('review') }, { html: reviewCard(S.flow), log: 'Showed booking review', delay: 300 });
+  }
+  if (kind === 'otp-req') {
+    const mobile = f.mobile.value.trim();
+    if (!mobOk(mobile)) return fail('Enter the mobile number in your hospital file, starting with 09.', f.mobile);
+    if (!f.bday.value) return fail('Enter your birthdate.', f.bday);
+    err.hidden = true; doneCard(f); S.flow = { otpMobile: mobile };
+    log('event', 'One-time code sent');
+    return say({ text: t('otpSent', maskMobile(mobile)) }, { html: otpCodeCard(), log: 'Asked for one-time code', delay: 300 });
+  }
+  if (kind === 'otp-code') {
+    if (f.code.value.replace(/\D/g, '') !== '482913') return fail(t('otpBad'), f.code);
+    err.hidden = true; doneCard(f); log('event', 'Patient verified by one-time code');
+    return say({ text: t('recReady') }, { html: recordsCard(), log: 'Showed appointment status, lab result availability and bills', delay: 400 }, anything());
+  }
+});
+async function confirmBooking() {
+  const f = S.flow;
+  await say({ text: t('booking'), delay: 250 });
+  await wait(900);
+  const ref = `LUD-${yymmdd(f.date)}-${String(430 + S.appts.length * 3).padStart(4, '0')}`;
+  const a = { ref, patient: f.p.name, mobile: f.p.mobile, hmo: f.p.hmo, doctor: f.doc.name, spec: f.doc.spec, room: f.doc.room, date: f.date, time: fmtT(f.time), channel: 'Website', status: 'Confirmed', isNew: true };
+  S.appts.unshift(a);
+  if (!S.live.tags.includes('Booked')) S.live.tags.push('Booked');
+  S.live.name = f.p.name;
+  log('event', `Appointment ${ref} saved in HMS`);
+  S.flow = null;
+  say({ html: confirmCard(a), log: `Booked ${a.doctor}, ${fmtD(a.date)} ${a.time} · ${ref}`, delay: 0 }, { text: t('booked', maskMobile(a.mobile)), delay: 400 }, anything());
+}
+
+function send(text) {
+  text = text.trim(); if (!text) return;
+  addUser(text); clearChips(); route(text);
+}
+$('#cw-form').addEventListener('submit', e => { e.preventDefault(); const v = input.value; input.value = ''; autoGrow(); send(v); });
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#cw-form').requestSubmit(); } });
+const autoGrow = () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 96) + 'px'; };
+input.addEventListener('input', autoGrow);
+
+/* voice (Premium, simulated) */
+$('#cw-mic').addEventListener('click', async () => {
+  const row = $('#cw-in'), saved = row.innerHTML;
+  const box = el(`<div class="listen" role="status"><span class="bars"><i></i><i></i><i></i><i></i></span>${esc(t('listening'))}</div>`);
+  input.hidden = true; $('#cw-mic').classList.add('rec'); row.insertBefore(box, input);
+  await wait(1800);
+  box.remove(); input.hidden = false; $('#cw-mic').classList.remove('rec');
+  input.value = t('voiceSample'); autoGrow(); await wait(500);
+  const v = input.value; input.value = ''; autoGrow(); send(v);
+  void saved;
+});
+
+/* open / close, language */
+function openChat(open) { $('#cw').hidden = !open; $('#cw-launch').hidden = open; if (open) { scrollEnd(); } }
+$('#cw-min').addEventListener('click', () => openChat(false));
+$('#cw-launch').addEventListener('click', () => { openChat(true); input.focus(); });
+$('#cw-priv').addEventListener('click', () => { openChat(true); say({ html: consentCard().replace('data-card="consent"', 'data-card="notice"').replace(/<div class="cacts">[\s\S]*?<\/div>\s*<\/div>$/, '</div>'), log: 'Showed privacy notice', delay: 200 }); });
+$('#cw-lang').addEventListener('change', e => {
+  S.lang = e.target.value; applyI18n(); clearChips();
+  say({ text: t('langSet'), chips: mainChips(), delay: 300 });
+});
+function applyI18n() {
+  $$('[data-i18n]').forEach(n => { n.textContent = t(n.dataset.i18n); });
+  input.placeholder = t('placeholder');
+  $('#cw-er').innerHTML = `${icon('phone', 14, 2.2)}<span>${esc(t('erStrip'))}</span><b style="margin-left:auto">${ER}</b>`;
+  setStatusLine();
+}
+function greet() {
+  say({ text: has('book') ? t('greet1') : t('greet1b'), delay: 0 }, { text: t('greet2'), delay: 0, chips: mainChips() });
+}
+function resetChat() {
+  S.epoch++; S.q = Promise.resolve(); typing(false);
+  $$('.msg,.sys,.typing', body).forEach(n => n.remove()); clearChips();
+  S.live = newLive(); S.flow = null; S.consent = false; if (S.sel === 'live') S.sel = null;
+  setStatusLine(); greet();
+}
+
+/* site buttons */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-site]'); if (!b) return;
+  openChat(true);
+  const k = b.dataset.site;
+  if (k === 'book') { addUser(t('c_book')); doIntent('book'); }
+  if (k === 'doctor') { addUser(t('c_doctor')); doIntent('doctor'); }
+  if (k === 'open') input.focus();
+});
+
+/* =========================================================
+   Staff panel
+   ========================================================= */
+function seed() {
+  const ag = (m) => m;
+  S.convos = [
+    { id: 'c2', name: 'Ramon Dizon', channel: 'messenger', lang: 'English', status: 'waiting', started: '10:44 AM', wait: 4, tags: ['Handover'], msgs: [
+      { role: 'patient', text: 'Good morning. My mother was discharged yesterday and I think we were charged twice for the CT scan.', t: '10:44 AM' },
+      { role: 'assistant', text: 'I’m sorry about that. Questions about a specific bill need a staff member, so I’m connecting you with Patient Relations now.', t: '10:44 AM' },
+      { role: 'event', text: 'Handed over to staff · waiting', t: '10:44 AM' },
+      { role: 'patient', text: 'Okay. I have the official receipt number if you need it.', t: '10:45 AM' }] },
+    { id: 'c5', name: 'Website visitor', channel: 'web', lang: 'Taglish', status: 'assistant', started: '10:47 AM', tags: [], msgs: [
+      { role: 'patient', text: 'Magkano po private room?', t: '10:47 AM' },
+      { role: 'assistant', text: 'Ang Private room ay ₱4,500 bawat araw (kuwarto lang; hiwalay ang professional fee ng doktor, gamot at mga test). Para sa estimate, tumawag sa Billing: (042) 555-0104.', t: '10:47 AM' },
+      { role: 'patient', text: 'covered po ba ng maxicare?', t: '10:48 AM' },
+      { role: 'assistant', text: 'Yes po, tinatanggap namin ang Maxicare. Depende sa plan mo ang coverage ng room. Dalhin ang Maxicare card at valid ID. Some plans need a Letter of Authorization (LOA) first.', t: '10:48 AM' }] },
+    { id: 'c1', name: 'Liza Manalo', channel: 'messenger', lang: 'Taglish', status: 'resolved', started: '10:31 AM', tags: ['Booked'], msgs: [
+      { role: 'patient', text: 'Hi po, may pedia ba kayo bukas ng umaga?', t: '10:31 AM' },
+      { role: 'assistant', text: 'Showed doctor list: Pediatrics (2)', t: '10:31 AM' },
+      { role: 'patient', text: 'Kay Dr. Mendoza po sana, 10:30', t: '10:32 AM' },
+      { role: 'event', text: 'Privacy consent given (RA 10173)', t: '10:32 AM' },
+      { role: 'event', text: 'Appointment LUD-' + yymmdd(nextDates(DOCS[2], 1)[0]) + '-0417 saved in HMS', t: '10:34 AM' },
+      { role: 'assistant', text: 'Booked ka na! Nag-send ako ng confirmation via SMS sa 0917 ••• 2254.', t: '10:34 AM' },
+      { role: 'patient', text: 'Salamat po!', t: '10:34 AM' }] },
+    { id: 'c3', name: 'Website visitor', channel: 'web', lang: 'Filipino', status: 'resolved', started: '9:58 AM', tags: ['Emergency'], msgs: [
+      { role: 'patient', text: 'sumasakit po dibdib ng tatay ko at pinagpapawisan siya', t: '9:58 AM' },
+      { role: 'event', text: 'Emergency words detected · ER hotline shown', t: '9:58 AM' },
+      { role: 'assistant', text: 'Showed emergency card with ER hotline ' + ER, t: '9:58 AM' },
+      { role: 'patient', text: 'papunta na kami salamat', t: '9:59 AM' }] },
+    { id: 'c4', name: 'Ana Pascual', channel: 'web', lang: 'English', status: 'staff', started: '9:40 AM', tags: ['Handover'], msgs: [
+      { role: 'patient', text: 'I need to move my appointment with Dr. Aquino to next week.', t: '9:40 AM' },
+      { role: 'assistant', text: 'I can’t change an existing appointment, so I’m connecting you with Patient Relations.', t: '9:40 AM' },
+      { role: 'event', text: 'Joanna Reyes joined the chat', t: '9:42 AM' },
+      { role: 'staff', text: 'Hi Ana, this is Joanna. I can help with that. Which day next week works for you?', t: '9:42 AM' },
+      { role: 'patient', text: 'Wednesday afternoon if possible.', t: '9:44 AM' }] },
+    { id: 'c6', name: 'Jun Villareal', channel: 'messenger', lang: 'Filipino', status: 'resolved', started: '9:12 AM', tags: [], msgs: [
+      { role: 'patient', text: 'Anong oras po pwede dumalaw?', t: '9:12 AM' },
+      { role: 'assistant', text: kb('visiting').fil, t: '9:12 AM' },
+      { role: 'patient', text: 'Pwede po ba ang 3 bisita?', t: '9:13 AM' },
+      { role: 'assistant', text: 'Dalawang bisita lang bawat pasyente sa isang pagkakataon. Puwedeng magpalitan ang mga bisita sa lobby.', t: '9:13 AM' }] },
+    { id: 'c7', name: 'Website visitor', channel: 'web', lang: 'English', status: 'resolved', started: '8:40 AM', tags: ['Medical advice declined'], msgs: [
+      { role: 'patient', text: 'what antibiotic should I take for a sore throat', t: '8:40 AM' },
+      { role: 'assistant', text: L.en.advice, t: '8:40 AM' },
+      { role: 'patient', text: 'ok ENT then', t: '8:41 AM' },
+      { role: 'assistant', text: 'Showed doctor list: ENT (1)', t: '8:41 AM' }] }
+  ];
+  void ag;
+  const mk = (docId, k, mins, patient, channel, status, n) => { const d = DOCS.find(x => x.id === docId); const date = k === 0 ? today0() : nextDates(d, 1, k)[0]; return { ref: `LUD-${yymmdd(date)}-${String(n).padStart(4, '0')}`, patient, doctor: d.name, spec: d.spec, room: d.room, date, time: fmtT(d.s + mins), channel, status }; };
+  S.appts = [
+    mk(3, 1, 30, 'Gabriel Manalo', 'Messenger', 'Confirmed', 417),
+    mk(5, 2, 60, 'Carmela Reyes', 'Website', 'Confirmed', 421),
+    mk(9, 1, 0, 'Noel Abrenica', 'Website', 'Confirmed', 409),
+    mk(1, 0, 30, 'Mark Anthony Ilagan', 'Website', 'Checked in', 398),
+    mk(6, 0, 120, 'Rosario Dimaculangan', 'Messenger', 'Checked in', 402),
+    mk(8, 3, 90, 'Edwin Salvacion', 'Messenger', 'Cancelled', 386)
+  ];
+}
+
+function convList() {
+  let list = S.convos.filter(c => has('messenger') || c.channel !== 'messenger');
+  if (S.live.msgs.some(m => m.role === 'patient')) list = [S.live, ...list];
+  return list;
+}
+const findConv = id => convList().find(c => c.id === id);
+const waitingCount = () => convList().filter(c => c.status === 'waiting').length;
+const STATUS = {
+  assistant: ['Assistant', 'p-green'], waiting: ['Waiting', 'p-gold'], staff: ['With staff', 'p-navy'], resolved: ['Resolved', 'p-grey']
+};
+const tagPill = tg => tg === 'Emergency' ? `<span class="pill p-red">${icon('alert', 11, 2.4)} Emergency</span>` : tg === 'Booked' ? `<span class="pill p-green">${icon('cal', 11, 2.4)} Booked</span>` : tg === 'Handover' ? '' : `<span class="pill p-grey">${esc(tg)}</span>`;
+const chIcon = c => `<span class="ch-ic" title="${c === 'web' ? 'Website' : 'Messenger'}">${icon(c === 'web' ? 'globe' : 'msgr', 14)}</span>`;
+
+function renderNav() {
+  const w = waitingCount();
+  const items = [
+    ['conversations', 'chat', 'Conversations', w ? `<span class="cnt">${w}</span>` : ''],
+    ['answers', 'book', 'Answers', ''],
+    has('book') && ['appointments', 'cal', 'Appointments', ''],
+    has('reports') && ['reports', 'chart', 'Reports', '']
+  ].filter(Boolean);
+  $('#st-nav').innerHTML = items.map(([k, ic, lb, extra]) => `<button type="button" class="nv" data-tab="${k}" ${S.tab === k ? 'aria-current="page"' : ''}>${icon(ic, 17)} ${lb}${extra}</button>`).join('');
+  $('#st-chan').innerHTML = `<h4>Channels</h4>
+    <div class="chn"><span>${icon('globe', 14)} Website</span><span class="pill p-green">Live</span></div>
+    <div class="chn"><span>${icon('msgr', 14)} Messenger</span>${has('messenger') ? '<span class="pill p-green">Live</span>' : '<span class="pill p-grey">Not in Basic</span>'}</div>
+    <div class="chn"><span>${icon('db', 14)} HMS link</span>${has('doctor') ? '<span class="pill p-green">Synced</span>' : '<span class="pill p-grey">Not in Basic</span>'}</div>`;
+}
+
+function renderStaff() {
+  renderNav();
+  const m = $('#st-main');
+  if (S.tab === 'conversations') return renderConversations(m);
+  if (S.tab === 'answers') return renderAnswers(m);
+  if (S.tab === 'appointments') return renderAppointments(m);
+  if (S.tab === 'reports') return renderReports(m);
+}
+
+/* --- Conversations --- */
+function renderConversations(m) {
+  const all = convList();
+  const w = waitingCount();
+  const live = all.filter(c => c.live).length;
+  const emerg = all.filter(c => c.tags.includes('Emergency')).length;
+  const counts = { all: all.length, waiting: w, assistant: all.filter(c => c.status === 'assistant').length, staff: all.filter(c => c.status === 'staff').length, resolved: all.filter(c => c.status === 'resolved').length };
+  m.innerHTML = `
+    <div class="pg-h">
+      <div><h2>Conversations</h2><p>Website${has('messenger') ? ' and Messenger' : ''} chats, today</p></div>
+      <div class="metrics">
+        <div class="metric"><b>${142 + live}</b><span>Conversations</span></div>
+        <div class="metric"><b>86%</b><span>Answered by assistant</span></div>
+        ${has('book') ? `<div class="metric"><b>${23 + S.appts.filter(a => a.isNew).length}</b><span>Bookings</span></div>` : ''}
+        ${has('handover') ? `<div class="metric ${w ? 'warn' : ''}"><b>${w}</b><span>Waiting for staff</span></div>` : ''}
+        <div class="metric ${emerg ? 'crit' : ''}"><b>${emerg}</b><span>Emergency alerts</span></div>
+      </div>
+    </div>
+    <div class="split ${S.sel ? 'has-sel' : ''}" id="split">
+      <div class="lst">
+        <div class="filters" role="group" aria-label="Filter conversations">
+          ${[['all', 'All'], ['waiting', 'Waiting'], ['assistant', 'Assistant'], ['staff', 'With staff'], ['resolved', 'Resolved']].filter(([k]) => has('handover') || (k !== 'waiting' && k !== 'staff')).map(([k, l]) => `<button type="button" class="flt" data-filter="${k}" aria-pressed="${S.filter === k}">${l} <span class="num">${counts[k]}</span></button>`).join('')}
+        </div>
+        <div class="items" id="items"></div>
+      </div>
+      <div class="det" id="det"></div>
+    </div>`;
+  renderItems(); renderDetail();
+}
+function renderItems() {
+  const box = $('#items'); if (!box) return;
+  const list = convList().filter(c => S.filter === 'all' || c.status === S.filter);
+  if (!list.length) { box.innerHTML = `<div class="empty"><h3>Nothing here</h3><p>No conversations match this filter.</p></div>`; return; }
+  box.innerHTML = list.map(c => {
+    const last = [...c.msgs].reverse().find(x => x.role !== 'event');
+    const [sl, sc] = STATUS[c.status];
+    const waitTxt = c.status === 'waiting' ? (c.live ? 'Waiting · just now' : `Waiting ${c.wait} min`) : sl;
+    return `<button type="button" class="it" data-conv="${c.id}" aria-current="${S.sel === c.id}">
+      <span class="av">${c.name === 'Website visitor' ? 'WV' : initials(c.name)}</span>
+      <span class="nm">${chIcon(c.channel)} ${esc(c.name)}${c.live ? ' <span class="pill p-gold" style="font-size:10.5px">Your demo</span>' : ''}</span>
+      <span class="tm">${c.started}</span>
+      <span class="pv">${last ? (last.role === 'patient' ? '' : last.role === 'staff' ? 'You: ' : 'Assistant: ') + esc(last.text) : ''}</span>
+      <span></span>
+      <span class="tg"><span class="pill ${sc}">${waitTxt}</span>${c.tags.map(tagPill).join('')}<span class="pill p-grey">${c.lang}</span></span>
+    </button>`;
+  }).join('');
+}
+function renderDetail() {
+  const box = $('#det'); if (!box) return;
+  const c = S.sel && findConv(S.sel);
+  if (!c) { box.innerHTML = `<div class="empty"><h3>Select a conversation</h3><p>Open a chat to read the transcript${has('handover') ? ', take over from the assistant, or reply to a patient waiting for staff' : ''}.</p></div>`; return; }
+  const draft = $('#reply')?.dataset.conv === c.id ? $('#reply').value : '';
+  const [sl, sc] = STATUS[c.status];
+  let acts = '';
+  if (has('handover')) {
+    if (c.status === 'waiting') acts = `<button type="button" class="btn btn-green btn-sm" data-cact="take">Accept chat</button>`;
+    else if (c.status === 'assistant') acts = `<button type="button" class="btn btn-plain btn-sm" data-cact="take">Take over</button><button type="button" class="btn btn-plain btn-sm" data-cact="resolve">Mark resolved</button>`;
+    else if (c.status === 'staff') acts = `<button type="button" class="btn btn-plain btn-sm" data-cact="return">Return to assistant</button><button type="button" class="btn btn-green btn-sm" data-cact="resolve">Mark resolved</button>`;
+  } else if (c.status !== 'resolved') acts = `<button type="button" class="btn btn-plain btn-sm" data-cact="resolve">Mark resolved</button>`;
+  box.innerHTML = `
+    <div class="det-h">
+      <button type="button" class="back" data-cact="back" aria-label="Back to list">${icon('back', 20)}</button>
+      <div><h3>${esc(c.name)}</h3><div class="sub">${chIcon(c.channel)} ${c.channel === 'web' ? 'Website' : 'Messenger'} · ${c.lang} · started ${c.started} <span class="pill ${sc}">${sl}</span></div></div>
+      <div class="acts">${acts}</div>
+    </div>
+    <div class="trans" id="trans">${c.msgs.map(x => {
+      if (x.role === 'event') return `<div class="tm-ev ${/Emergency/.test(x.text) ? 'crit' : /consent|verified/i.test(x.text) ? 'priv' : ''}">${esc(x.text)} · ${x.t}</div>`;
+      const lb = x.role === 'patient' ? esc(c.name) : x.role === 'staff' ? 'Joanna Reyes (you)' : 'Assistant';
+      const isCard = x.role === 'assistant' && /^(Showed|Booked|Asked)/.test(x.text);
+      return `<div class="tm-row ${x.role}"><span class="lb">${lb} · ${x.t}</span><div class="bb ${isCard ? 'card-log' : ''}">${isCard ? esc(x.text) : rich(x.text)}</div></div>`;
+    }).join('')}</div>
+    ${c.status === 'staff'
+      ? `<form class="composer" id="reply-form"><label class="sr" for="reply">Reply</label><textarea id="reply" data-conv="${c.id}" rows="1" placeholder="Reply to ${esc(c.name)}…"></textarea><button type="submit" class="btn btn-navy">Send</button></form>`
+      : `<div class="composer"><p class="composer-note">${c.status === 'resolved' ? 'This conversation is resolved.' : has('handover') ? 'The assistant is handling this chat. Take over to reply yourself.' : 'Live handover to staff is part of the Standard and Premium packages.'}</p></div>`}`;
+  const tr = $('#trans'); tr.scrollTop = tr.scrollHeight;
+  const r = $('#reply'); if (r) { r.value = draft; r.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#reply-form').requestSubmit(); } }); }
+}
+function convAction(act) {
+  const c = findConv(S.sel); if (!c && act !== 'back') return;
+  if (act === 'back') { S.sel = null; $('#split').classList.remove('has-sel'); renderItems(); return; }
+  if (act === 'take') {
+    c.status = 'staff'; c.msgs.push({ role: 'event', text: 'Joanna Reyes joined the chat', t: nowT() });
+    if (c.live) { addSys(esc(t('joined', 'Joanna'))); setStatusLine(); }
+    toast(`You’re now chatting with ${c.name}.`);
+  }
+  if (act === 'return') {
+    c.status = 'assistant'; c.msgs.push({ role: 'event', text: 'Returned to the assistant', t: nowT() });
+    if (c.live) { addSys(esc(t('left'))); setStatusLine(); setChips(mainChips()); }
+    toast('The assistant is handling this chat again.');
+  }
+  if (act === 'resolve') { c.status = 'resolved'; c.msgs.push({ role: 'event', text: 'Marked resolved by Joanna Reyes', t: nowT() }); if (c.live) setStatusLine(); toast('Marked resolved.'); }
+  renderConversations($('#st-main')); renderNav();
+}
+
+/* --- Answers --- */
+function renderAnswers(m) {
+  m.innerHTML = `
+    <div class="pg-h"><div><h2>Answers</h2><p>What the assistant tells patients. Changes go live as soon as you publish.</p></div></div>
+    <div class="split kb" id="kbsplit">
+      <div class="lst">
+        <div class="search"><label>${icon('search', 15)}<span class="sr">Search answers</span><input id="kb-q" type="search" placeholder="Search answers" value="${esc(S.kbQuery)}"></label></div>
+        <div class="items" id="kb-items"></div>
+      </div>
+      <div class="det" id="kb-ed"></div>
+    </div>`;
+  renderKbItems(); renderKbEditor();
+  $('#kb-q').addEventListener('input', e => { S.kbQuery = e.target.value; renderKbItems(); });
+}
+function renderKbItems() {
+  const q = S.kbQuery.toLowerCase();
+  const list = KB.filter(k => !q || (k.title + ' ' + k.cat + ' ' + k.en).toLowerCase().includes(q));
+  $('#kb-items').innerHTML = list.length ? list.map(k => `<button type="button" class="it kb-it" data-kb="${k.id}" aria-current="${S.kbSel === k.id}" style="grid-template-columns:minmax(0,1fr) auto">
+      <span class="ttl">${esc(k.title)}</span><span class="tm num">${k.count} asks</span>
+      <span class="meta" style="grid-column:1/-1"><span>${esc(k.cat)}</span><span>Edited ${esc(k.upd)}</span></span>
+    </button>`).join('') : `<div class="empty"><p>No answers match “${esc(S.kbQuery)}”.</p></div>`;
+}
+function renderKbEditor() {
+  const k = kb(S.kbSel), box = $('#kb-ed');
+  const val = S.kbTab === 'en' ? k.en : k.fil;
+  box.innerHTML = `<div class="ed">
+    <div class="ed-top">
+      <div><h3>${esc(k.title)}</h3><p>${esc(k.cat)} · asked ${k.count} times this month · last edited ${esc(k.upd)}</p></div>
+      <button type="button" class="btn btn-plain btn-sm" data-kact="try">${icon('chat', 15)} Try it in the chat</button>
+    </div>
+    <div class="panel"><div class="panel-h">Patients ask it like this</div><div class="panel-b asks">${k.asks.map(a => `<span class="ask">${esc(a)}</span>`).join('')}</div></div>
+    <div class="ed-grid">
+      <div class="panel">
+        <div class="panel-h"><span>Answer</span>
+          <div class="tabs" role="tablist">
+            <button type="button" class="tab" role="tab" data-ktab="en" aria-selected="${S.kbTab === 'en'}">English</button>
+            <button type="button" class="tab" role="tab" data-ktab="fil" aria-selected="${S.kbTab === 'fil'}">Filipino</button>
+          </div></div>
+        <div class="panel-b">
+          <label class="sr" for="kb-text">Answer text</label>
+          <textarea id="kb-text">${esc(val)}</textarea>
+          <p class="hint">Start a line with “- ” to make a bullet. Taglish replies are written by the assistant from these two versions.</p>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-h">Preview in chat</div><div class="panel-b prev"><div class="bubble" id="kb-prev">${rich(val)}</div></div></div>
+    </div>
+    <div class="ed-acts"><button type="button" class="btn btn-green" data-kact="save">Publish changes</button><button type="button" class="btn btn-plain" data-kact="discard">Discard</button><span class="saved" id="kb-saved"></span></div>
+  </div>`;
+  $('#kb-text').addEventListener('input', e => { $('#kb-prev').innerHTML = rich(e.target.value); $('#kb-saved').textContent = ''; });
+}
+function kbAction(act) {
+  const k = kb(S.kbSel);
+  if (act === 'save') {
+    const v = $('#kb-text').value.trim(); if (!v) { toast('Write an answer before publishing.'); return; }
+    k[S.kbTab] = v; k.upd = 'just now · Joanna Reyes';
+    if (k.id === 'visiting') { const mt = /(\d{1,2}:\d{2}\s?[AP]M)\s*(?:to|–|-|hanggang)\s*(\d{1,2}:\d{2}\s?[AP]M)/i.exec(k.en); if (mt) $('#today-visit').textContent = `${mt[1]} – ${mt[2]}`; }
+    renderKbItems(); renderKbEditor();
+    $('#kb-saved').textContent = 'Published. The assistant uses this answer now.';
+    toast('Answer published');
+  }
+  if (act === 'discard') { renderKbEditor(); }
+  if (act === 'try') {
+    S.lang = S.kbTab === 'en' ? 'en' : 'fil'; $('#cw-lang').value = S.lang; applyI18n();
+    setView('patient'); openChat(true);
+    setTimeout(() => send(S.kbTab === 'en' ? k.asks[0] : (k.asks.find(a => !/^(What|How|Do|When|Can|Where)/.test(a)) || k.asks[0])), 250);
+  }
+}
+
+/* --- Appointments --- */
+function lockedPanel(title, text, items, pkg) {
+  return `<div class="pad"><div class="locked">
+    <span class="pill p-gold">${icon('lock', 11, 2.4)} ${pkg} package</span>
+    <h3>${title}</h3><p>${text}</p><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>
+    <button type="button" class="btn btn-green" data-pkg-go="${pkg.toLowerCase()}">Preview with ${pkg}</button>
+  </div></div>`;
+}
+function renderAppointments(m) {
+  if (!has('book')) {
+    m.innerHTML = `<div class="pg-h"><div><h2>Appointments</h2><p>Bookings made through the assistant</p></div></div>` +
+      lockedPanel('Booking in the HMS is not in Basic', 'With Standard, patients pick a doctor, date and time in the chat, and the booking is saved straight into the Hospital Management System.', ['Live doctor directory and clinic schedules', 'Appointment booking with SMS confirmation', 'Every booking listed here for the front desk'], 'Standard');
+    return;
+  }
+  const rows = S.appts;
+  const stPill = s => s === 'Confirmed' ? 'p-green' : s === 'Checked in' ? 'p-navy' : 'p-grey';
+  m.innerHTML = `<div class="pg-h"><div><h2>Appointments</h2><p>${rows.length} bookings made through the assistant · saved in the HMS automatically</p></div>
+      <div class="metrics"><div class="metric"><b>${rows.filter(a => a.status !== 'Cancelled').length}</b><span>Active</span></div><div class="metric"><b>${rows.filter(a => a.channel === 'Messenger').length}</b><span>From Messenger</span></div></div></div>
+    <div class="pad"><div class="tbl-w"><table>
+      <thead><tr><th>Reference</th><th>Patient</th><th>Doctor</th><th>Schedule</th><th>Booked via</th><th>HMS status</th>${has('reminders') ? '<th>Reminder</th>' : ''}</tr></thead>
+      <tbody>${rows.map(a => `<tr class="${a.isNew ? 'new' : ''}">
+        <td class="mono">${a.ref}${a.isNew ? '<small style="color:var(--green);font-family:var(--f-head);font-weight:700">New · your demo</small>' : ''}</td>
+        <td>${esc(a.patient)}</td>
+        <td>${esc(a.doctor)}<small>${esc(a.spec)}</small></td>
+        <td class="num">${fmtD(a.date)}<small>${a.time}</small></td>
+        <td>${a.channel}</td>
+        <td><span class="pill ${stPill(a.status)}">${a.status}</span></td>
+        ${has('reminders') ? `<td>${a.status === 'Cancelled' ? '—' : a.status === 'Checked in' ? '<span class="pill p-grey">Sent</span>' : '<span class="pill p-gold">SMS + email scheduled</span>'}</td>` : ''}
+      </tr>`).join('')}</tbody></table></div></div>`;
+}
+
+/* --- Reports --- */
+function renderReports(m) {
+  const month = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  if (!has('reports')) {
+    m.innerHTML = `<div class="pg-h"><div><h2>Reports</h2><p>Monthly summary of the assistant’s work</p></div></div>` +
+      lockedPanel('Monthly reports are part of Premium', 'A monthly summary for management: what patients ask most, how many bookings the assistant made, and how often staff had to step in.', ['Top questions and how they were answered', 'Bookings per week and by channel', 'Handovers, emergency alerts and languages used'], 'Premium');
+    return;
+  }
+  const top = [['Visiting hours', 412], ['Doctor schedules', 388], ['Room rates', 301], ['Accepted HMOs', 276], ['Lab result release', 190], ['Directions and parking', 141]];
+  const max = top[0][1];
+  const wk = [['Oct 27', 86], ['Nov 3', 94], ['Nov 10', 108], ['Nov 17', 124]];
+  const wmax = 140;
+  m.innerHTML = `<div class="pg-h"><div><h2>Reports</h2><p>${month} · month to date · sample figures</p></div><button type="button" class="btn btn-plain btn-sm" data-rep="send">Email to management</button></div>
+  <div class="pad"><div class="rp">
+    <div class="panel wide"><div class="kpis">
+      <div class="kpi"><b>3,112</b><span>Conversations</span><em>+18% vs October</em></div>
+      <div class="kpi"><b>84%</b><span>Answered without staff</span><em>+3 pts</em></div>
+      <div class="kpi"><b>412</b><span>Bookings made</span><em>+21%</em></div>
+      <div class="kpi"><b>196</b><span>Handovers to staff</span><em style="color:var(--muted)">6% of chats</em></div>
+      <div class="kpi"><b style="color:var(--red-700)">14</b><span>Emergency alerts</span><em style="color:var(--muted)">ER hotline shown</em></div>
+    </div></div>
+    <div class="panel"><div class="panel-h">Top questions</div><div class="panel-b">
+      ${top.map(([l, v]) => `<div class="hbar"><span>${l}</span><span class="tr"><i style="width:${(v / max * 100).toFixed(1)}%"></i></span><b>${v}</b></div>`).join('')}
+    </div></div>
+    <div class="panel"><div class="panel-h">Bookings per week</div><div class="panel-b">
+      <div class="cols">${wk.map(([l, v], i) => `<div class="col"><b>${v}</b><i class="${i === wk.length - 1 ? 'last' : ''}" style="height:${(v / wmax * 100).toFixed(1)}%"></i></div>`).join('')}</div>
+      <div class="col-l">${wk.map(([l]) => `<span>${l}</span>`).join('')}</div>
+    </div></div>
+    <div class="panel"><div class="panel-h">Channel</div><div class="panel-b">
+      <div class="stack"><i style="width:58%;background:var(--green)"></i><i style="width:42%;background:var(--navy)"></i></div>
+      <div class="legend"><span><i style="background:var(--green)"></i>Website 58%</span><span><i style="background:var(--navy)"></i>Messenger 42%</span></div>
+    </div></div>
+    <div class="panel"><div class="panel-h">Language used</div><div class="panel-b">
+      <div class="stack"><i style="width:46%;background:var(--green)"></i><i style="width:31%;background:var(--navy)"></i><i style="width:23%;background:#8FB3A0"></i></div>
+      <div class="legend"><span><i style="background:var(--green)"></i>Taglish 46%</span><span><i style="background:var(--navy)"></i>Filipino 31%</span><span><i style="background:#8FB3A0"></i>English 23%</span></div>
+    </div></div>
+  </div></div>`;
+}
+
+/* staff events */
+$('#v-staff').addEventListener('click', e => {
+  const n = e.target.closest('[data-tab]'); if (n) { S.tab = n.dataset.tab; return renderStaff(); }
+  const f = e.target.closest('[data-filter]'); if (f) { S.filter = f.dataset.filter; return renderConversations($('#st-main')); }
+  const c = e.target.closest('[data-conv]'); if (c) { S.sel = c.dataset.conv; $('#split').classList.add('has-sel'); renderItems(); renderDetail(); return; }
+  const a = e.target.closest('[data-cact]'); if (a) return convAction(a.dataset.cact);
+  const k = e.target.closest('[data-kb]'); if (k) { S.kbSel = k.dataset.kb; renderKbItems(); renderKbEditor(); return; }
+  const kt = e.target.closest('[data-ktab]'); if (kt) { S.kbTab = kt.dataset.ktab; renderKbEditor(); return; }
+  const ka = e.target.closest('[data-kact]'); if (ka) return kbAction(ka.dataset.kact);
+  const pg = e.target.closest('[data-pkg-go]'); if (pg) return setPkg(pg.dataset.pkgGo);
+  if (e.target.closest('[data-rep]')) toast('Report sent to the management mailing list.');
+});
+$('#v-staff').addEventListener('submit', e => {
+  if (e.target.id !== 'reply-form') return;
+  e.preventDefault();
+  const r = $('#reply'), text = r.value.trim(); if (!text) return;
+  const c = findConv(r.dataset.conv); if (!c) return;
+  c.msgs.push({ role: 'staff', text, t: nowT() });
+  if (c.live) addStaffMsg(text);
+  r.value = '';
+  renderItems(); renderDetail(); $('#reply')?.focus();
+});
+
+/* =========================================================
+   Prototype controls
+   ========================================================= */
+let toastT;
+function toast(msg) { const tEl = $('#toast'); tEl.textContent = msg; tEl.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { tEl.hidden = true; }, 2600); }
+
+function setView(v) {
+  S.view = v;
+  $('#v-patient').hidden = v !== 'patient'; $('#v-staff').hidden = v !== 'staff';
+  $$('#seg-view button').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === v));
+  $('#ctl-scn').hidden = v !== 'patient';
+  if (v === 'staff') renderStaff();
+  if (location.hash !== '#' + v) history.replaceState(null, '', '#' + v);
+}
+function setPkg(p) {
+  if (p === S.pkg) return;
+  S.pkg = p;
+  $$('#seg-pkg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.pkg === p));
+  $('#cw-mic').hidden = !has('voice');
+  if (!has('book') && (S.tab === 'appointments')) { /* keep tab, shows locked panel */ }
+  if (S.sel && !findConv(S.sel)) S.sel = null;
+  buildScenarios(); resetChat();
+  if (S.view === 'staff') renderStaff();
+  toast(`${p[0].toUpperCase() + p.slice(1)} package · ${t('pkgReset')}`);
+}
+$('#seg-view').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setView(b.dataset.view); });
+window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (v === 'patient' || v === 'staff') setView(v); });
+
+const SCN = [
+  { id: 'emerg', label: 'Emergency words', text: 'My father has chest pain and is sweating', lang: 'en' },
+  { id: 'fil', label: 'Question in Filipino', text: 'Magkano po ang private room?', lang: 'fil' },
+  { id: 'book', label: 'Book a pediatrician', text: 'I want to book a pediatrician for my son', lang: 'en', need: 'book' },
+  { id: 'advice', label: 'Asks for medical advice', text: 'What medicine should I take for a fever?', lang: 'en' },
+  { id: 'hmo', label: 'HMO question (Taglish)', text: 'Tumatanggap po ba kayo ng Intellicare?', lang: 'tl' },
+  { id: 'staff', label: 'Asks for a person', text: 'Can I talk to a staff member about my bill?', lang: 'en', need: 'handover' },
+  { id: 'rec', label: 'Checks lab results', text: 'Is my lab result ready?', lang: 'en', need: 'records' }
+];
+function buildScenarios() {
+  $('#scenario').innerHTML = '<option value="">Try a scenario…</option>' + SCN.filter(s => !s.need || has(s.need)).map(s => `<option value="${s.id}">${s.label}</option>`).join('');
+}
+$('#scenario').addEventListener('change', async e => {
+  const s = SCN.find(x => x.id === e.target.value); e.target.value = ''; if (!s) return;
+  openChat(true);
+  if (S.lang !== s.lang) { S.lang = s.lang; $('#cw-lang').value = s.lang; applyI18n(); }
+  input.value = ''; input.focus();
+  for (const ch of s.text) { input.value += ch; await wait(18); }
+  autoGrow(); await wait(250);
+  const v = input.value; input.value = ''; autoGrow(); send(v);
+});
+
+/* =========================================================
+   Init
+   ========================================================= */
+$('#strip-er').innerHTML = `${icon('phone', 13, 2.4)} Emergency 24/7 · ${ER}`;
+$('#foot-er').textContent = ER;
+$('#today-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+new ResizeObserver(() => document.documentElement.style.setProperty('--proto-h', $('.proto').getBoundingClientRect().bottom + 'px')).observe($('.proto'));
+seed(); applyI18n(); buildScenarios(); greet();
+if (matchMedia('(max-width:640px)').matches) openChat(false);
+setView(location.hash === '#staff' ? 'staff' : 'patient');
+})();
+</script>
+</body>
+</html>
